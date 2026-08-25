@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.dist/
+dist/
+packages/condense-*/bin/
+*.bun-build
+.*.bun-build
+
+# Pack archives
+*.tgz
+
+# Logs and runtime artifacts
+logs/
+*.log
+local-server.lock
+local-server.pid
+datasets/
+
+# Coverage and test artifacts
+coverage/
+
+# OS and IDE files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+.env
+.env.local

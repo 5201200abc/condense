@@ -1,0 +1,68 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 0,
+  "workspaces": {
+    "": {
+      "name": "distill-workspace",
+      "devDependencies": {
+        "@clack/prompts": "0.11.0",
+      },
+    },
+    "packages/cli": {
+      "name": "condense",
+      "version": "1.5.2",
+      "bin": {
+        "condense": "bin/condense.js",
+        "distill": "bin/distill.js",
+      },
+      "optionalDependencies": {
+        "condense-darwin-arm64": "1.5.2",
+        "condense-darwin-x64": "1.5.2",
+        "condense-linux-arm64": "1.5.2",
+        "condense-linux-x64": "1.5.2",
+        "condense-win32-x64": "1.5.2",
+      },
+    },
+    "packages/condense-darwin-arm64": {
+      "name": "condense-darwin-arm64",
+      "version": "1.5.2",
+    },
+    "packages/condense-darwin-x64": {
+      "name": "condense-darwin-x64",
+      "version": "1.5.2",
+    },
+    "packages/condense-linux-arm64": {
+      "name": "condense-linux-arm64",
+      "version": "1.5.2",
+    },
+    "packages/condense-linux-x64": {
+      "name": "condense-linux-x64",
+      "version": "1.5.2",
+    },
+    "packages/condense-win32-x64": {
+      "name": "condense-win32-x64",
+      "version": "1.5.2",
+    },
+  },
+  "packages": {
+    "@clack/core": ["@clack/core@0.5.0", "", { "dependencies": { "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-p3y0FIOwaYRUPRcMO7+dlmLh8PSRcrjuTndsiA0WAFbWES0mLZlrjVoBRZ9DzkPFJZG6KGkJmoEAY0ZcVWTkow=="],
+
+    "@clack/prompts": ["@clack/prompts@0.11.0", "", { "dependencies": { "@clack/core": "0.5.0", "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-pMN5FcrEw9hUkZA4f+zLlzivQSeQf5dRGJjSUbvVYDLvpKCdQx5OaknvKzgbtXOizhP+SJJJjqEbOe55uKKfAw=="],
+
+    "condense": ["condense@workspace:packages/cli"],
+
+    "condense-darwin-arm64": ["condense-darwin-arm64@workspace:packages/condense-darwin-arm64"],
+
+    "condense-darwin-x64": ["condense-darwin-x64@workspace:packages/condense-darwin-x64"],
+
+    "condense-linux-arm64": ["condense-linux-arm64@workspace:packages/condense-linux-arm64"],
+
+    "condense-linux-x64": ["condense-linux-x64@workspace:packages/condense-linux-x64"],
+
+    "condense-win32-x64": ["condense-win32-x64@workspace:packages/condense-win32-x64"],
+
+    "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
+
+    "sisteransi": ["sisteransi@1.0.5", "", {}, "sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg=="],
+  }
+}

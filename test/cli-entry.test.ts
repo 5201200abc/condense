@@ -1,0 +1,342 @@
+import { describe, expect, it } from "bun:test";
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile
+} from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import cliPackage from "../packages/cli/package.json";
+import { createScriptCommand } from "./script-command";
+
+const root = path.resolve(import.meta.dir, "..");
+const cli = path.join(root, "src", "cli.ts");
+const itUnixOnly = process.platform === "win32" ? it.skip : it;
+
+describe("cli entrypoint", () => {
+  it("prints help", () => {
+    const result = spawnSync("bun", ["run", cli, "--help"], {
+      cwd: root,
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('cmd 2>&1 | condense "question"');
+  });
+
+  it("prints the version", () => {
+    const result = spawnSync("bun", ["run", cli, "--version"], {
+      cwd: root,
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(cliPackage.version);
+  });
+
+  it("fails on unsupported platforms", () => {
+    const launcher = JSON.stringify(path.join(root, "packages", "cli", "bin", "condense.js"));
+    const result = spawnSync(
+      "node",
+      [
+        "-e",
+        `Object.defineProperty(process, "platform", { value: "haiku" }); Object.defineProperty(process, "arch", { value: "x64" }); require(${launcher});`
+      ],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("[condense] Unsupported platform: haiku/x64.");
+  });
+
+  itUnixOnly("fails without stdin when attached to a tty", () => {
+    const scriptCommand = createScriptCommand("/dev/null", "bun", [
+      "run",
+      cli,
+      "is this safe?"
+    ]);
+    const result = spawnSync(scriptCommand.command, scriptCommand.args, {
+      cwd: root,
+      encoding: "utf8"
+    });
+
+    expect(result.status).toBe(2);
+    expect(`${result.stdout}${result.stderr}`).toContain("stdin is required.");
+  });
+
+  it("persists config commands", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-cli-config-"));
+    const configPath = path.join(dir, "config.json");
+
+    try {
+      const setModel = spawnSync(
+        "bun",
+        ["run", cli, "config", "model", "qwen3.5:2b"],
+        {
+          cwd: root,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            CONDENSE_CONFIG_PATH: configPath
+          }
+        }
+      );
+
+      const setDatasetEnabled = spawnSync(
+        "bun",
+        ["run", cli, "config", "dataset-enabled", "false"],
+        {
+          cwd: root,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            CONDENSE_CONFIG_PATH: configPath
+          }
+        }
+      );
+
+      expect(setModel.status).toBe(0);
+      expect(setDatasetEnabled.status).toBe(0);
+      expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
+        model: "qwen3.5:2b",
+        datasetEnabled: false
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs dsl memory commands", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-cli-dsl-"));
+    const configPath = path.join(dir, "config.json");
+    const env = {
+      ...process.env,
+      CONDENSE_CONFIG_PATH: configPath
+    };
+
+    try {
+      const addFirst = spawnSync(
+        "bun",
+        ["run", cli, "dsl", "add", "alias", "A1", "authentication fix", "--scope", "global"],
+        { cwd: root, encoding: "utf8", env }
+      );
+      const addSecond = spawnSync(
+        "bun",
+        ["run", cli, "dsl", "add", "alias", "A1", "authentication fix", "--scope", "global"],
+        { cwd: root, encoding: "utf8", env }
+      );
+      const show = spawnSync("bun", ["run", cli, "dsl", "show", "--scope", "global"], {
+        cwd: root,
+        encoding: "utf8",
+        env
+      });
+
+      expect(addFirst.status).toBe(0);
+      expect(addFirst.stdout).toContain("candidate A1");
+      expect(addSecond.status).toBe(0);
+      expect(addSecond.stdout).toContain("active A1");
+      expect(show.status).toBe(0);
+      expect(show.stdout).toContain("A1\talias\tactive");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs onboarding with local model and skill install defaults", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-onboarding-"));
+    const home = path.join(dir, "home");
+    const configPath = path.join(dir, "config.json");
+    const oldBlock = [
+      "keep before",
+      "<!-- condense skill: begin -->",
+      "old condense instructions",
+      "<!-- condense skill: end -->",
+      "keep after"
+    ].join("\n");
+
+    try {
+      await mkdir(path.join(home, ".codex"), { recursive: true });
+      await mkdir(path.join(home, ".claude"), { recursive: true });
+      await writeFile(path.join(home, ".codex", "AGENTS.md"), oldBlock);
+      await writeFile(path.join(home, ".claude", "CLAUDE.md"), oldBlock);
+
+      const result = spawnSync("bun", ["run", cli], {
+        cwd: root,
+        encoding: "utf8",
+        input: [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "120000",
+          ""
+        ].join("\n"),
+        env: {
+          ...process.env,
+          HOME: home,
+          USERPROFILE: home,
+          CONDENSE_CONFIG_PATH: configPath,
+          CONDENSE_PACKAGE_ROOT: root,
+          CONDENSE_ONBOARDING_PRELOAD: "false"
+        }
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("condense onboarding");
+      expect(result.stdout).toContain("/condense skill installed for Codex and Claude");
+      expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
+        provider: "local",
+        localBackend: "auto",
+        localConcurrency: 5,
+        localHost: "127.0.0.1",
+        localPort: 8009,
+        timeoutMs: 120000
+      });
+      const dslMemory = JSON.parse(
+        await readFile(path.join(dir, "dsl", "global.json"), "utf8")
+      ) as { entries: Array<{ key: string; status: string; builtin?: boolean }> };
+
+      expect(dslMemory.entries).toEqual([]);
+      expect(
+        await readFile(
+          path.join(home, ".codex", "skills", "condense", "SKILL.md"),
+          "utf8"
+        )
+      ).toContain("name: condense");
+      expect(
+        await readFile(
+          path.join(home, ".claude", "skills", "condense", "SKILL.md"),
+          "utf8"
+        )
+      ).toContain("name: condense");
+      const codexInstructions = await readFile(
+        path.join(home, ".codex", "AGENTS.md"),
+        "utf8"
+      );
+      const claudeInstructions = await readFile(
+        path.join(home, ".claude", "CLAUDE.md"),
+        "utf8"
+      );
+
+      for (const instructions of [codexInstructions, claudeInstructions]) {
+        expect(instructions).toContain("keep before");
+        expect(instructions).toContain("keep after");
+        expect(instructions).not.toContain("old condense instructions");
+        expect(
+          instructions.match(/<!-- condense skill: begin -->/g) ?? []
+        ).toHaveLength(1);
+        expect(instructions).toContain("Always communicate with the user in `/condense`");
+        expect(instructions).toContain(
+          "Do not return a rewritten/compressed copy of the user's prompt"
+        );
+        expect(instructions).toContain("Keep hidden chain-of-thought private");
+        expect(instructions).toContain("fixed prefixes S/C/D/R/O/N/P");
+        expect(instructions).toContain("task aliases A/B/F/E/V/X/U/DB/CFG/DOC/PERM");
+        expect(instructions).toContain(
+          "Dict: S=state C=context D=action R=risk O=outcome N=no-go P=proof"
+        );
+        expect(instructions).toContain("shortest unambiguous key possible");
+        expect(instructions).toContain(
+          "For every non-interactive, non-TUI shell/tool command, pipe output through `condense`"
+        );
+        expect(instructions).toContain(
+          "Skip `| condense` only when exact raw output is required"
+        );
+        expect(instructions).toContain(
+          'bun test 2>&1 | condense "Did tests pass? Return PASS or FAIL'
+        );
+        expect(instructions).toContain(
+          'git diff | condense "What changed? Return only files changed'
+        );
+        expect(instructions).toContain(
+          'terraform plan 2>&1 | condense "Is this safe? Return SAFE, REVIEW, or UNSAFE'
+        );
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runs onboarding with external API config when explicitly selected", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-onboarding-external-"));
+    const home = path.join(dir, "home");
+    const configPath = path.join(dir, "config.json");
+
+    try {
+      const result = spawnSync("bun", ["run", cli], {
+        cwd: root,
+        encoding: "utf8",
+        input: [
+          "external",
+          "http://127.0.0.1:1234/v1",
+          "external-model",
+          "test-key",
+          "120000",
+          "n"
+        ].join("\n"),
+        env: {
+          ...process.env,
+          HOME: home,
+          USERPROFILE: home,
+          CONDENSE_CONFIG_PATH: configPath,
+          CONDENSE_PACKAGE_ROOT: root
+        }
+      });
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
+        provider: "external",
+        host: "http://127.0.0.1:1234/v1",
+        model: "external-model",
+        apiKey: "test-key",
+        timeoutMs: 120000
+      });
+      expect(result.stdout).toContain("skill install skipped");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  itUnixOnly("falls back to the workspace binary when the platform package is not installed", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-workspace-fallback-"));
+    const fakeTargetDir = path.join(
+      dir,
+      "packages",
+      `condense-${process.platform}-${process.arch}`,
+      "bin"
+    );
+    const launcherPath = path.join(dir, "packages", "cli", "bin", "condense.js");
+    const fakeBinaryPath = path.join(fakeTargetDir, "condense");
+
+    try {
+      await mkdir(path.dirname(launcherPath), { recursive: true });
+      await mkdir(fakeTargetDir, { recursive: true });
+      await copyFile(path.join(root, "packages", "cli", "bin", "condense.js"), launcherPath);
+      await writeFile(
+        fakeBinaryPath,
+        "#!/bin/sh\nprintf 'workspace fallback\\n'\n"
+      );
+      await chmod(fakeBinaryPath, 0o755);
+
+      const result = spawnSync("node", [launcherPath, "--version"], {
+        cwd: dir,
+        encoding: "utf8"
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe("workspace fallback\n");
+      expect(result.stderr).toBe("");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

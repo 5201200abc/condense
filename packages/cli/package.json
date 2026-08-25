@@ -1,0 +1,47 @@
+{
+  "name": "condense",
+  "version": "1.5.2",
+  "description": "Compress command output for downstream LLMs.",
+  "license": "Apache-2.0",
+  "bin": {
+    "condense": "bin/condense.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "skills"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "condense-darwin-arm64": "1.5.2",
+    "condense-darwin-x64": "1.5.2",
+    "condense-linux-arm64": "1.5.2",
+    "condense-linux-x64": "1.5.2",
+    "condense-win32-x64": "1.5.2"
+  },
+  "author": "condense team (https://github.com/5201200abc/condense)",
+  "homepage": "https://github.com/5201200abc/condense#readme",
+  "bugs": {
+    "url": "https://github.com/5201200abc/condense/issues"
+  },
+  "keywords": [
+    "condense",
+    "cli",
+    "terminal",
+    "compression",
+    "tokens",
+    "llm",
+    "agent",
+    "mlx",
+    "local-ai"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/5201200abc/condense"
+  }
+}

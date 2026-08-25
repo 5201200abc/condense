@@ -58,6 +58,4 @@ Real-world test data measured on live hardware:
 | **Terraform Plan** | 248 tokens | 28 tokens | **88.6%** | **0.61s** | Detects destructive database recreation and emits `UNSAFE` verdict |
 | **Large Git Diff** | 39 modified files | 3 lines | **95.2%** | **0.48s** | Filters code diffs, emits concise modified file list and summary |
 
-## License
-
 Apache License 2.0. See [LICENSE](./LICENSE) for details.
