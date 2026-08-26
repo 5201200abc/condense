@@ -83,9 +83,6 @@ export async function runUpgradeCommand(): Promise<string> {
     lines.push("To upgrade condense, run:");
     lines.push("  curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh");
     lines.push("");
-    lines.push("Or via Homebrew:");
-    lines.push("  brew update && brew upgrade 5201200abc/tap/condense");
-    lines.push("");
     lines.push("Or via npm:");
     lines.push("  npm install -g condense@latest");
   } else {

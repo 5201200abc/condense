@@ -25,12 +25,6 @@
 curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
 ```
 
-### Homebrew
-
-```bash
-brew install 5201200abc/tap/condense
-```
-
 ### Package Managers
 
 ```bash
@@ -47,12 +41,6 @@ To upgrade `condense` to the latest version:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
-```
-
-### Homebrew
-
-```bash
-brew update && brew upgrade 5201200abc/tap/condense
 ```
 
 ### Package Managers
