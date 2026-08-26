@@ -63,7 +63,11 @@ export function buildLocalServerArgs(
       "--host",
       config.localHost,
       "--port",
-      String(config.localPort)
+      String(config.localPort),
+      "--prompt-cache-size",
+      "0",
+      "--prompt-cache-bytes",
+      "0"
     ];
   }
 

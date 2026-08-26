@@ -40,7 +40,11 @@ describe("local server backend selection", () => {
       "--host",
       "127.0.0.1",
       "--port",
-      "8009"
+      "8009",
+      "--prompt-cache-size",
+      "0",
+      "--prompt-cache-bytes",
+      "0"
     ]);
   });
 
