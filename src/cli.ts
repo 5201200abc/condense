@@ -21,6 +21,7 @@ import {
   summarizeWatch
 } from "./llm";
 import { runOnboarding } from "./onboarding";
+import { runStatsCommand } from "./stats";
 import { CondenseSession, type ProgressPhase } from "./stream-condenser";
 import { resolveDatasetPath } from "./dataset";
 import {
@@ -121,6 +122,16 @@ async function run(): Promise<number> {
 
           return JSON.parse(response) as DslThreadLearnReview[];
         }
+      })
+    );
+    return 0;
+  }
+
+  if (command.kind === "stats") {
+    process.stdout.write(
+      await runStatsCommand(command.args, {
+        env: process.env,
+        cwd: process.cwd()
       })
     );
     return 0;

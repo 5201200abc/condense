@@ -150,6 +150,40 @@ describe("cli entrypoint", () => {
     }
   });
 
+  it("runs stats commands", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-cli-stats-"));
+    const configPath = path.join(dir, "config.json");
+    const env = {
+      ...process.env,
+      CONDENSE_CONFIG_PATH: configPath
+    };
+
+    try {
+      const showStats = spawnSync("bun", ["run", cli, "stats"], {
+        cwd: root,
+        encoding: "utf8",
+        env
+      });
+
+      expect(showStats.status).toBe(0);
+      expect(showStats.stdout).toContain("Condense Character Savings Summary (Global)");
+      expect(showStats.stdout).toContain("No condense runs recorded yet.");
+
+      const showJson = spawnSync("bun", ["run", cli, "stats", "--json"], {
+        cwd: root,
+        encoding: "utf8",
+        env
+      });
+
+      expect(showJson.status).toBe(0);
+      const parsed = JSON.parse(showJson.stdout) as { scope: string; summary: { calls: number } };
+      expect(parsed.scope).toBe("Global");
+      expect(parsed.summary.calls).toBe(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("runs onboarding with local model and skill install defaults", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "condense-onboarding-"));
     const home = path.join(dir, "home");

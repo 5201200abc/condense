@@ -24,7 +24,8 @@ const defaultAutoLearnConfig = {
   autoLearnScope: DEFAULT_AUTO_LEARN_SCOPE,
   autoLearnSource: DEFAULT_AUTO_LEARN_SOURCE,
   autoPromoteScopes: DEFAULT_AUTO_PROMOTE_SCOPES,
-  maxPromptDslEntries: DEFAULT_MAX_PROMPT_DSL_ENTRIES
+  maxPromptDslEntries: DEFAULT_MAX_PROMPT_DSL_ENTRIES,
+  showStats: false
 };
 const expectedLocalModel =
   process.platform === "darwin" && process.arch === "arm64"
@@ -41,6 +42,17 @@ describe("parseCommand", () => {
     expect(parseCommand(["dsl", "show", "--scope", "global"], {}, {})).toEqual({
       kind: "dsl",
       args: ["show", "--scope", "global"]
+    });
+  });
+
+  it("parses stats and savings commands", () => {
+    expect(parseCommand(["stats", "--project"], {}, {})).toEqual({
+      kind: "stats",
+      args: ["--project"]
+    });
+    expect(parseCommand(["savings", "--json"], {}, {})).toEqual({
+      kind: "stats",
+      args: ["--json"]
     });
   });
 
@@ -77,6 +89,7 @@ describe("parseCommand", () => {
         "10",
         "--api-key",
         "secret",
+        "--stats",
         "summarize"
       ],
       {},
@@ -98,7 +111,8 @@ describe("parseCommand", () => {
         timeoutMs: 10,
         datasetEnabled: false,
         datasetPath: undefined,
-        ...defaultAutoLearnConfig
+        ...defaultAutoLearnConfig,
+        showStats: true
       }
     });
   });
@@ -246,7 +260,8 @@ describe("parseCommand", () => {
       autoLearnScope: "project",
       autoLearnSource: "output",
       autoPromoteScopes: false,
-      maxPromptDslEntries: 12
+      maxPromptDslEntries: 12,
+      showStats: false
     });
   });
 

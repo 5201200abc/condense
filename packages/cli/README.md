@@ -45,6 +45,30 @@ npx tsc --noEmit 2>&1 | condense "Did build succeed? List exact error files and 
 git diff 2>&1 | condense "What changed? Return only modified files and summary."
 ```
 
+### Character Savings and Metrics
+
+Track how many characters and lines `condense` has saved across your workflow:
+
+```bash
+# View global summary of saved characters, lines, and compression ratio
+condense stats
+
+# View summary with detailed history of recent compression commands
+condense stats -H
+
+# Filter metrics for the current project
+condense stats --project
+
+# Output metrics in JSON format
+condense stats --json
+
+# Filter metrics for the last N days
+condense stats --days 7
+
+# Print per-execution character savings to stderr alongside pipeline output
+bun test 2>&1 | condense --stats "Did tests pass?"
+```
+
 ---
 
 ## Benchmark Results
@@ -57,5 +81,7 @@ Real-world test data measured on live hardware:
 | **TypeScript Errors** | 187 tokens | 83 tokens | **55.1%** | **0.88s** | Extracts exact error files, line numbers, and error codes (`TS2339`, `TS2322`) |
 | **Terraform Plan** | 248 tokens | 28 tokens | **88.6%** | **0.61s** | Detects destructive database recreation and emits `UNSAFE` verdict |
 | **Large Git Diff** | 39 modified files | 3 lines | **95.2%** | **0.48s** | Filters code diffs, emits concise modified file list and summary |
+
+## License
 
 Apache License 2.0. See [LICENSE](./LICENSE) for details.

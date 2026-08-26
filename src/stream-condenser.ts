@@ -17,6 +17,11 @@ import {
   normalizeForModel,
   structuralSimilarity
 } from "./text";
+import {
+  formatSingleRunSummary,
+  recordCondenseRun,
+  type SingleRunStat
+} from "./stats";
 
 type Mode = "undecided" | "watch" | "interactive";
 export type ProgressPhase = "collecting" | "summarizing";
@@ -50,6 +55,7 @@ export interface CondenseSessionOptions {
   onProgressPhase?: (phase: ProgressPhase) => void;
   onProgressStop?: () => void;
   onBatchOutput?: (output: string) => Promise<void>;
+  onBatchStat?: (stat: SingleRunStat) => Promise<void> | void;
   idleMs?: number;
   interactiveGapMs?: number;
   progressFrameMs?: number;
@@ -68,9 +74,11 @@ export class CondenseSession {
   private readonly onProgressPhase: ((phase: ProgressPhase) => void) | null;
   private readonly onProgressStop: (() => void) | null;
   private readonly onBatchOutput: ((output: string) => Promise<void>) | null;
+  private readonly onBatchStat: ((stat: SingleRunStat) => Promise<void> | void) | null;
   private readonly idleMs: number;
   private readonly interactiveGapMs: number;
   private readonly progressFrameMs: number;
+  private readonly startTime: number;
   private readonly rawBuffers: Buffer[] = [];
   private readonly completedBursts: Burst[] = [];
   private currentBurstBuffers: Buffer[] = [];
@@ -100,9 +108,11 @@ export class CondenseSession {
     this.onProgressPhase = options.onProgressPhase ?? null;
     this.onProgressStop = options.onProgressStop ?? null;
     this.onBatchOutput = options.onBatchOutput ?? null;
+    this.onBatchStat = options.onBatchStat ?? null;
     this.idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
     this.interactiveGapMs = options.interactiveGapMs ?? DEFAULT_INTERACTIVE_GAP_MS;
     this.progressFrameMs = options.progressFrameMs ?? DEFAULT_PROGRESS_FRAME_MS;
+    this.startTime = Date.now();
     this.onProgressPhase?.(this.progressPhase);
     this.startProgress();
   }
@@ -169,9 +179,42 @@ export class CondenseSession {
       this.stdout.write(ensureTrailingNewline(output));
       await this.captureDatasetRecord(normalizedInput, output);
       await this.captureDslLearning(output);
+      await this.captureStatsRecord(rawInput, output, Date.now() - this.startTime);
     } catch {
       this.stopProgress(true);
       this.stdout.write(Buffer.concat(this.rawBuffers));
+    }
+  }
+
+  private async captureStatsRecord(
+    rawInput: string,
+    output: string,
+    durationMs: number
+  ): Promise<SingleRunStat | undefined> {
+    if (!this.runtimeConfig) {
+      return undefined;
+    }
+
+    try {
+      const stat = await recordCondenseRun(process.env, {
+        cwd: process.cwd(),
+        question: this.runtimeConfig.question,
+        rawInput,
+        output,
+        durationMs
+      });
+
+      if (this.onBatchStat) {
+        await this.onBatchStat(stat);
+      }
+
+      if (this.runtimeConfig.showStats && this.stderr) {
+        this.stderr.write(`${formatSingleRunSummary(stat)}\n`);
+      }
+
+      return stat;
+    } catch {
+      return undefined;
     }
   }
 

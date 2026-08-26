@@ -299,6 +299,12 @@ condense dsl learn-thread --stdin < transcript.txt
 
 This analyzes repeated usage, rejects sensitive/noisy terms, asks the configured reviewer model for strict JSON, and persists only compact candidates.
 
+To view character and line savings metrics and compression efficiency for the current project:
+
+```bash
+condense stats --project
+```
+
 ## Tool Calls
 
 CRITICAL: Every non-interactive, non-TUI shell/tool command must pipe output through `condense` with an explicit prompt. Do not run plain shell commands when summarized output is enough.

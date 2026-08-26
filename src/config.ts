@@ -45,6 +45,7 @@ export interface DistillSettings {
   autoLearnSource?: "output";
   autoPromoteScopes?: boolean;
   maxPromptDslEntries?: number;
+  showStats?: boolean;
 }
 
 export interface RuntimeConfig extends DistillSettings {
@@ -74,6 +75,7 @@ export type Command =
   | { kind: "help" }
   | { kind: "version" }
   | { kind: "dsl"; args: string[] }
+  | { kind: "stats"; args: string[] }
   | { kind: "configShow" }
   | { kind: "configGet"; key: ConfigKey }
   | { kind: "configSet"; key: ConfigKey; value: string | number | boolean }
@@ -305,6 +307,9 @@ export function resolveRuntimeDefaults(
       DEFAULT_MAX_PROMPT_DSL_ENTRIES,
     "max-prompt-dsl-entries"
   );
+  const showStats = coerceBoolean(
+    (env.CONDENSE_SHOW_STATS ?? env.DISTILL_SHOW_STATS) ?? persisted.showStats ?? false
+  );
 
   return {
     provider,
@@ -322,7 +327,8 @@ export function resolveRuntimeDefaults(
     autoLearnScope: DEFAULT_AUTO_LEARN_SCOPE,
     autoLearnSource: DEFAULT_AUTO_LEARN_SOURCE,
     autoPromoteScopes,
-    maxPromptDslEntries
+    maxPromptDslEntries,
+    showStats
   };
 }
 
@@ -468,6 +474,10 @@ export function parseCommand(
     return { kind: "dsl", args: argv.slice(1) };
   }
 
+  if (argv[0] === "stats" || argv[0] === "savings") {
+    return { kind: "stats", args: argv.slice(1) };
+  }
+
   if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) {
     return { kind: "help" };
   }
@@ -508,7 +518,8 @@ export function parseCommand(
         autoLearnScope: defaults.autoLearnScope,
         autoLearnSource: defaults.autoLearnSource,
         autoPromoteScopes: defaults.autoPromoteScopes,
-        maxPromptDslEntries: defaults.maxPromptDslEntries
+        maxPromptDslEntries: defaults.maxPromptDslEntries,
+        showStats: defaults.showStats
       }
     };
   }
@@ -517,6 +528,7 @@ export function parseCommand(
   let modelOverride: string | undefined;
   let hostOverride: string | undefined;
   let apiKeyOverride: string | undefined;
+  let showStats = defaults.showStats;
   const questionParts: string[] = [];
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -525,6 +537,11 @@ export function parseCommand(
     if (token === "--") {
       questionParts.push(...argv.slice(index + 1));
       break;
+    }
+
+    if (token === "--stats") {
+      showStats = true;
+      continue;
     }
 
     if (token === "--model" || token.startsWith("--model=")) {
@@ -602,7 +619,8 @@ export function parseCommand(
       autoLearnScope: defaults.autoLearnScope,
       autoLearnSource: defaults.autoLearnSource,
       autoPromoteScopes: defaults.autoPromoteScopes,
-      maxPromptDslEntries: defaults.maxPromptDslEntries
+      maxPromptDslEntries: defaults.maxPromptDslEntries,
+      showStats
     }
   };
 }
@@ -611,6 +629,13 @@ export function formatUsage(): string {
   return [
     "Usage:",
     '  cmd 2>&1 | condense "question"',
+    '  cmd 2>&1 | condense --stats "question"',
+    "  condense stats",
+    "  condense stats -H",
+    "  condense stats --project",
+    "  condense stats --json",
+    "  condense stats --days 7",
+    "  condense stats --reset",
     "  condense dsl show",
     "  condense dsl show --candidates",
     '  condense dsl learn --dry-run "Dict+: A1=auth fix"',
@@ -624,6 +649,7 @@ export function formatUsage(): string {
     '  condense --host http://127.0.0.1:1234/v1 --model my-model "summarize"',
     "",
     "Options:",
+    "  --stats               Print character savings summary to stderr on completion",
     `  --model <name>        External model name (default local model: ${CONDENSE_MLX_MODEL})`,
     `  --host <url>          External OpenAI-compatible base URL (default local: http://${DEFAULT_LOCAL_HOST}:${DEFAULT_LOCAL_PORT}/v1)`,
     "  --api-key <key>       API key (env: CONDENSE_API_KEY)",
