@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -34,6 +34,25 @@ function createDelayedSummarizer(delayMs: number, response: string) {
 }
 
 describe("CondenseSession", () => {
+  let testStatsDir = "";
+  const originalStatsPath = process.env.CONDENSE_STATS_PATH;
+
+  beforeAll(async () => {
+    testStatsDir = await mkdtemp(path.join(tmpdir(), "condense-test-stats-"));
+    process.env.CONDENSE_STATS_PATH = path.join(testStatsDir, "stats.json");
+  });
+
+  afterAll(async () => {
+    if (originalStatsPath !== undefined) {
+      process.env.CONDENSE_STATS_PATH = originalStatsPath;
+    } else {
+      delete process.env.CONDENSE_STATS_PATH;
+    }
+    if (testStatsDir) {
+      await rm(testStatsDir, { recursive: true, force: true });
+    }
+  });
+
   it("renders a batch summary", async () => {
     const writer = createWriter();
     const session = new CondenseSession({

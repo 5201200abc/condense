@@ -59,11 +59,13 @@ export interface CondenseSessionOptions {
   idleMs?: number;
   interactiveGapMs?: number;
   progressFrameMs?: number;
+  env?: NodeJS.ProcessEnv;
 }
 
 export type DistillSessionOptions = CondenseSessionOptions;
 
 export class CondenseSession {
+  private readonly env: NodeJS.ProcessEnv;
   private readonly summarizer: Summarizer;
   private readonly runtimeConfig: RuntimeConfig | null;
   private readonly dataset: DatasetAppendConfig | null;
@@ -98,6 +100,7 @@ export class CondenseSession {
   private lastProgressRenderAt = 0;
 
   constructor(options: DistillSessionOptions) {
+    this.env = options.env ?? process.env;
     this.summarizer = options.summarizer;
     this.runtimeConfig = options.runtimeConfig ?? null;
     this.dataset = options.dataset ?? null;
@@ -196,7 +199,7 @@ export class CondenseSession {
     }
 
     try {
-      const stat = await recordCondenseRun(process.env, {
+      const stat = await recordCondenseRun(this.env, {
         cwd: process.cwd(),
         question: this.runtimeConfig.question,
         rawInput,

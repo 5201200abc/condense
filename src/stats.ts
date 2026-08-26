@@ -37,10 +37,15 @@ export interface MetricSummary {
   durationMs: number;
 }
 
+export interface ProjectMetricSummary extends MetricSummary {
+  projectPath?: string;
+  recent?: SingleRunStat[];
+}
+
 export interface StatsStorageFile {
   version: 1;
   totals: MetricSummary;
-  byProject: Record<string, MetricSummary & { projectPath?: string }>;
+  byProject: Record<string, ProjectMetricSummary>;
   daily: Record<string, MetricSummary>;
   recent: SingleRunStat[];
   updatedAt: string;
@@ -316,11 +321,19 @@ export async function recordCondenseRun(
   if (!stats.byProject[projectHash]) {
     stats.byProject[projectHash] = {
       ...emptyMetricSummary(),
-      projectPath: options.cwd
+      projectPath: options.cwd,
+      recent: []
     };
   }
   updateMetricSummary(stats.byProject[projectHash], runStat);
   stats.byProject[projectHash].projectPath = options.cwd;
+  if (!Array.isArray(stats.byProject[projectHash].recent)) {
+    stats.byProject[projectHash].recent = [];
+  }
+  stats.byProject[projectHash].recent.unshift(runStat);
+  if (stats.byProject[projectHash].recent.length > 50) {
+    stats.byProject[projectHash].recent = stats.byProject[projectHash].recent.slice(0, 50);
+  }
 
   if (!stats.daily[dateKey]) {
     stats.daily[dateKey] = emptyMetricSummary();
@@ -328,8 +341,8 @@ export async function recordCondenseRun(
   updateMetricSummary(stats.daily[dateKey], runStat);
 
   stats.recent.unshift(runStat);
-  if (stats.recent.length > 50) {
-    stats.recent = stats.recent.slice(0, 50);
+  if (stats.recent.length > 200) {
+    stats.recent = stats.recent.slice(0, 200);
   }
 
   stats.updatedAt = now.toISOString();
@@ -431,9 +444,11 @@ export function formatStatsReport(
 
   let recentRuns = stats.recent;
   if (options.projectHash) {
-    recentRuns = recentRuns.filter(
-      (entry) => entry.projectHash === options.projectHash
-    );
+    const projectSummary = stats.byProject[options.projectHash];
+    recentRuns =
+      projectSummary?.recent && projectSummary.recent.length > 0
+        ? projectSummary.recent
+        : stats.recent.filter((entry) => entry.projectHash === options.projectHash);
   }
 
   if (options.days && options.days > 0) {
