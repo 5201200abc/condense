@@ -74,6 +74,7 @@ export type Command =
   | { kind: "onboard" }
   | { kind: "help" }
   | { kind: "version" }
+  | { kind: "upgrade" }
   | { kind: "dsl"; args: string[] }
   | { kind: "stats"; args: string[] }
   | { kind: "configShow" }
@@ -478,6 +479,10 @@ export function parseCommand(
     return { kind: "stats", args: argv.slice(1) };
   }
 
+  if (argv[0] === "upgrade" || argv[0] === "update") {
+    return { kind: "upgrade" };
+  }
+
   if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) {
     return { kind: "help" };
   }
@@ -636,6 +641,7 @@ export function formatUsage(): string {
     "  condense stats --json",
     "  condense stats --days 7",
     "  condense stats --reset",
+    "  condense update",
     "  condense dsl show",
     "  condense dsl show --candidates",
     '  condense dsl learn --dry-run "Dict+: A1=auth fix"',

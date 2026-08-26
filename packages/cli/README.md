@@ -39,6 +39,36 @@ npm install -g condense
 bun add -g condense
 ```
 
+## Upgrade
+
+To upgrade `condense` to the latest version:
+
+### Quick Install (Script)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
+```
+
+### Homebrew
+
+```bash
+brew update && brew upgrade 5201200abc/tap/condense
+```
+
+### Package Managers
+
+```bash
+npm install -g condense@latest
+# or
+bun add -g condense@latest
+```
+
+### CLI Check
+
+```bash
+condense update
+```
+
 Add the following minimal directive to `~/.claude/CLAUDE.md`:
 ```text
 <!-- condense -->

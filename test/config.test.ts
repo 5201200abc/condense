@@ -56,6 +56,11 @@ describe("parseCommand", () => {
     });
   });
 
+  it("parses update and upgrade commands", () => {
+    expect(parseCommand(["update"], {}, {})).toEqual({ kind: "upgrade" });
+    expect(parseCommand(["upgrade"], {}, {})).toEqual({ kind: "upgrade" });
+  });
+
   it("parses defaults and joins the question", () => {
     const command = parseCommand(["what", "changed?"], {}, {});
 
