@@ -2,6 +2,15 @@
   <img src="./assets/logo.svg" alt="condense logo" width="128" height="128" />
   <h1>condense</h1>
   <p><strong>Fast, local terminal output compression for coding agents and LLMs.</strong></p>
+
+  <p>
+    <a href="https://www.npmjs.com/package/condense"><img src="https://img.shields.io/npm/v/condense?color=blue&label=npm" alt="npm version" /></a>
+    <a href="https://github.com/5201200abc/condense/releases"><img src="https://img.shields.io/github/v/release/5201200abc/condense?color=brightgreen" alt="Release" /></a>
+    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0" /></a>
+    <a href="https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX"><img src="https://img.shields.io/badge/Model-distill2--0.6B-yellow" alt="HuggingFace Model" /></a>
+    <a href="https://github.com/5201200abc/condense"><img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-555.svg" alt="Platform" /></a>
+  </p>
+
   <p><code>condense</code> filters noisy terminal output (test runners, build logs, linter diagnostics, stack traces) locally via a streaming pipeline, passing only critical semantic information to downstream agents and eliminating over 90% of context window bloat.</p>
   <p>Model source: <a href="https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX">distill2-0.6B 4-bit quantized model</a> (only 404 MB model weights, 98.4% accuracy).</p>
 </div>
