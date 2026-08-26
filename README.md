@@ -12,20 +12,31 @@
   </p>
 
   <p><code>condense</code> filters noisy terminal output (test runners, build logs, linter diagnostics, stack traces) locally via a streaming pipeline, passing only critical semantic information to downstream agents and eliminating over 90% of context window bloat.</p>
-  <p>Model source: <a href="https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX">distill2-0.6B 4-bit quantized model</a> (only 404 MB model weights, 98.4% accuracy).</p>
+  <p>Model: <a href="https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX">distill2-0.6B 4-bit quantized model</a> (only 404 MB model weights, 98.4% accuracy).</p>
 </div>
 
 ---
 
 ## Installation
 
+### Quick Install (macOS / Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
+```
+
+### Homebrew
+
+```bash
+brew install 5201200abc/tap/condense
+```
+
+### Package Managers
+
 ```bash
 npm install -g condense
 # or
 bun add -g condense
-
-# Initialize local runtime environment and model weights
-condense
 ```
 
 Add the following minimal directive to `~/.claude/CLAUDE.md`:

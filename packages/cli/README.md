@@ -19,13 +19,24 @@
 
 ## Installation
 
+### Quick Install (macOS / Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
+```
+
+### Homebrew
+
+```bash
+brew install 5201200abc/tap/condense
+```
+
+### Package Managers
+
 ```bash
 npm install -g condense
 # or
 bun add -g condense
-
-# Initialize local runtime environment and model weights
-condense
 ```
 
 Add the following minimal directive to `~/.claude/CLAUDE.md`:
