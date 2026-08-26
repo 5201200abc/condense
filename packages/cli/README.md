@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="./assets/logo.svg" alt="condense logo" width="128" height="128" />
-  <h1>condense</h1>
-  <p><strong>Fast, local terminal output compression for coding agents and LLMs.</strong></p>
+  <img src="./assets/logo.svg" alt="condense logo" width="112" height="112" style="display: block; margin: 0 auto;" />
+  <h1 style="margin: 4px 0 8px 0; padding: 0; border-bottom: none;">condense</h1>
+  <p style="margin: 0 0 12px 0;"><strong>Fast, local terminal output compression for coding agents and LLMs.</strong></p>
 
-  <p>
+  <p style="margin: 0 0 16px 0;">
     <a href="https://www.npmjs.com/package/condense"><img src="https://img.shields.io/npm/v/condense?color=blue&label=npm" alt="npm version" /></a>
     <a href="https://github.com/5201200abc/condense/releases"><img src="https://img.shields.io/github/v/release/5201200abc/condense?color=brightgreen" alt="Release" /></a>
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0" /></a>
