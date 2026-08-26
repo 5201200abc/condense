@@ -12,7 +12,7 @@
   </p>
 
   <p><code>condense</code> filters noisy terminal output (test runners, build logs, linter diagnostics, stack traces) locally via a streaming pipeline, passing only critical semantic information to downstream agents and eliminating over 90% of context window bloat.</p>
-  <p>Model: <a href="https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX">distill2-0.6B 4-bit quantized model</a> (only 404 MB model weights, 98.4% accuracy).</p>
+  <p>Model source: <a href="https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX">distill2-0.6B 4-bit quantized model</a> (only 404 MB model weights, 98.4% accuracy).</p>
 </div>
 
 ---
