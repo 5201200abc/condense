@@ -1,15 +1,9 @@
 <div align="center">
-
-<img src="./assets/logo.svg" alt="condense logo" width="140" height="140" />
-
-# condense
-
-**Fast, local terminal output compression for coding agents and LLMs.**
-
-`condense` filters noisy terminal output (test runners, build logs, linter diagnostics, stack traces) locally via a streaming pipeline, passing only critical semantic information to downstream agents and eliminating over 90% of context window bloat.
-
-Model source: [distill2-0.6B 4-bit quantized model](https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX) (only 404 MB model weights, 98.4% accuracy).
-
+  <img src="./assets/logo.svg" alt="condense logo" width="128" height="128" />
+  <h1>condense</h1>
+  <p><strong>Fast, local terminal output compression for coding agents and LLMs.</strong></p>
+  <p><code>condense</code> filters noisy terminal output (test runners, build logs, linter diagnostics, stack traces) locally via a streaming pipeline, passing only critical semantic information to downstream agents and eliminating over 90% of context window bloat.</p>
+  <p>Model source: <a href="https://huggingface.co/samuelfaj/distill2-0.6B-4bit-MLX">distill2-0.6B 4-bit quantized model</a> (only 404 MB model weights, 98.4% accuracy).</p>
 </div>
 
 ---
