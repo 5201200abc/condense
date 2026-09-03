@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { UsageError } from "./config";
 import { hashProjectPath } from "./dsl-memory";
+import { withFileLock } from "./file-lock";
 import { resolveConfigPath } from "./user-config";
 
 export interface SingleRunStat {
@@ -40,6 +41,7 @@ export interface MetricSummary {
 export interface ProjectMetricSummary extends MetricSummary {
   projectPath?: string;
   recent?: SingleRunStat[];
+  daily?: Record<string, MetricSummary>;
 }
 
 export interface StatsStorageFile {
@@ -66,6 +68,7 @@ export interface FormatStatsOptions {
   days?: number;
   json?: boolean;
   history?: boolean;
+  now?: Date;
 }
 
 export interface StatsCommandContext {
@@ -119,6 +122,47 @@ export function resolveStatsPath(env: NodeJS.ProcessEnv): string {
   return path.join(path.dirname(resolveConfigPath(env)), "stats.json");
 }
 
+export function resolveStatsLockPath(env: NodeJS.ProcessEnv): string {
+  return `${resolveStatsPath(env)}.lock`;
+}
+
+function normalizeRecent(entries: unknown): SingleRunStat[] {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  return entries.map((entry) => {
+    const item = entry as SingleRunStat;
+    const inputChars = item.inputChars ?? 0;
+    const outputChars = item.outputChars ?? 0;
+    const inputTokens = item.inputTokens ?? Math.round(inputChars / 4);
+    const outputTokens = item.outputTokens ?? Math.round(outputChars / 4);
+
+    return {
+      ...item,
+      inputTokens,
+      outputTokens,
+      savedTokens: item.savedTokens ?? Math.max(0, inputTokens - outputTokens)
+    };
+  });
+}
+
+function normalizeDaily(
+  daily: unknown
+): Record<string, MetricSummary> {
+  const next: Record<string, MetricSummary> = {};
+
+  if (!daily || typeof daily !== "object") {
+    return next;
+  }
+
+  for (const [key, val] of Object.entries(daily as Record<string, Partial<MetricSummary>>)) {
+    next[key] = normalizeSummaryTokens(val);
+  }
+
+  return next;
+}
+
 function normalizeSummaryTokens(summary: Partial<MetricSummary>): MetricSummary {
   const calls = summary.calls ?? 0;
   const inputChars = summary.inputChars ?? 0;
@@ -161,37 +205,20 @@ export async function readStatsFile(
       return emptyStatsStorage(now);
     }
 
-    const byProject: Record<string, MetricSummary & { projectPath?: string }> = {};
+    const byProject: Record<string, ProjectMetricSummary> = {};
     if (parsed.byProject && typeof parsed.byProject === "object") {
       for (const [key, val] of Object.entries(parsed.byProject)) {
         byProject[key] = {
           ...normalizeSummaryTokens(val),
-          projectPath: val.projectPath
+          projectPath: val.projectPath,
+          recent: normalizeRecent(val.recent),
+          daily: normalizeDaily(val.daily)
         };
       }
     }
 
-    const daily: Record<string, MetricSummary> = {};
-    if (parsed.daily && typeof parsed.daily === "object") {
-      for (const [key, val] of Object.entries(parsed.daily)) {
-        daily[key] = normalizeSummaryTokens(val);
-      }
-    }
-
-    const recent: SingleRunStat[] = (Array.isArray(parsed.recent) ? parsed.recent : []).map(
-      (entry) => ({
-        ...entry,
-        inputTokens: entry.inputTokens ?? Math.round((entry.inputChars ?? 0) / 4),
-        outputTokens: entry.outputTokens ?? Math.round((entry.outputChars ?? 0) / 4),
-        savedTokens:
-          entry.savedTokens ??
-          Math.max(
-            0,
-            (entry.inputTokens ?? Math.round((entry.inputChars ?? 0) / 4)) -
-              (entry.outputTokens ?? Math.round((entry.outputChars ?? 0) / 4))
-          )
-      })
-    );
+    const daily = normalizeDaily(parsed.daily);
+    const recent = normalizeRecent(parsed.recent);
 
     return {
       version: 1,
@@ -257,6 +284,34 @@ function updateMetricSummary(
   target.durationMs += run.durationMs;
 }
 
+function addMetricSummary(target: MetricSummary, source: MetricSummary): void {
+  target.calls += source.calls;
+  target.inputChars += source.inputChars;
+  target.outputChars += source.outputChars;
+  target.savedChars += source.savedChars;
+  target.inputLines += source.inputLines;
+  target.outputLines += source.outputLines;
+  target.savedLines += source.savedLines;
+  target.inputTokens += source.inputTokens;
+  target.outputTokens += source.outputTokens;
+  target.savedTokens += source.savedTokens;
+  target.durationMs += source.durationMs;
+}
+
+function subtractMetricSummary(target: MetricSummary, source: MetricSummary): void {
+  target.calls = Math.max(0, target.calls - source.calls);
+  target.inputChars = Math.max(0, target.inputChars - source.inputChars);
+  target.outputChars = Math.max(0, target.outputChars - source.outputChars);
+  target.savedChars = Math.max(0, target.savedChars - source.savedChars);
+  target.inputLines = Math.max(0, target.inputLines - source.inputLines);
+  target.outputLines = Math.max(0, target.outputLines - source.outputLines);
+  target.savedLines = Math.max(0, target.savedLines - source.savedLines);
+  target.inputTokens = Math.max(0, target.inputTokens - source.inputTokens);
+  target.outputTokens = Math.max(0, target.outputTokens - source.outputTokens);
+  target.savedTokens = Math.max(0, target.savedTokens - source.savedTokens);
+  target.durationMs = Math.max(0, target.durationMs - source.durationMs);
+}
+
 function resolveRunDescription(question?: string, rawInput?: string): string {
   const cleanQ = question?.trim();
   if (cleanQ && cleanQ.toLowerCase() !== "condense") {
@@ -280,99 +335,136 @@ export async function recordCondenseRun(
   env: NodeJS.ProcessEnv,
   options: RecordCondenseRunOptions
 ): Promise<SingleRunStat> {
-  const now = options.now ?? new Date();
-  const inputChars = options.rawInput.length;
-  const outputChars = options.output.length;
-  const inputLines = countLines(options.rawInput);
-  const outputLines = countLines(options.output);
-  const savedChars = Math.max(0, inputChars - outputChars);
-  const savedLines = Math.max(0, inputLines - outputLines);
-  const inputTokens = estimateTokens(options.rawInput);
-  const outputTokens = estimateTokens(options.output);
-  const savedTokens = Math.max(0, inputTokens - outputTokens);
-  const projectHash = hashProjectPath(options.cwd);
-  const durationMs = Math.max(0, Math.round(options.durationMs));
-  const charCompressionRatio =
-    inputChars > 0 ? Number(((savedChars / inputChars) * 100).toFixed(2)) : 0;
+  return withFileLock(
+    resolveStatsLockPath(env),
+    async () => {
+      const now = options.now ?? new Date();
+      const inputChars = options.rawInput.length;
+      const outputChars = options.output.length;
+      const inputLines = countLines(options.rawInput);
+      const outputLines = countLines(options.output);
+      const savedChars = Math.max(0, inputChars - outputChars);
+      const savedLines = Math.max(0, inputLines - outputLines);
+      const inputTokens = estimateTokens(options.rawInput);
+      const outputTokens = estimateTokens(options.output);
+      const savedTokens = Math.max(0, inputTokens - outputTokens);
+      const projectHash = hashProjectPath(options.cwd);
+      const durationMs = Math.max(0, Math.round(options.durationMs));
+      const charCompressionRatio =
+        inputChars > 0 ? Number(((savedChars / inputChars) * 100).toFixed(2)) : 0;
 
-  const runStat: SingleRunStat = {
-    timestamp: now.toISOString(),
-    projectHash,
-    projectPath: options.cwd,
-    question: resolveRunDescription(options.question, options.rawInput),
-    inputChars,
-    outputChars,
-    savedChars,
-    inputLines,
-    outputLines,
-    savedLines,
-    inputTokens,
-    outputTokens,
-    savedTokens,
-    durationMs,
-    charCompressionRatio
-  };
+      const runStat: SingleRunStat = {
+        timestamp: now.toISOString(),
+        projectHash,
+        projectPath: options.cwd,
+        question: resolveRunDescription(options.question, options.rawInput),
+        inputChars,
+        outputChars,
+        savedChars,
+        inputLines,
+        outputLines,
+        savedLines,
+        inputTokens,
+        outputTokens,
+        savedTokens,
+        durationMs,
+        charCompressionRatio
+      };
 
-  const stats = await readStatsFile(env, now);
-  const dateKey = now.toISOString().slice(0, 10);
+      const stats = await readStatsFile(env, now);
+      const dateKey = now.toISOString().slice(0, 10);
 
-  updateMetricSummary(stats.totals, runStat);
+      updateMetricSummary(stats.totals, runStat);
 
-  if (!stats.byProject[projectHash]) {
-    stats.byProject[projectHash] = {
-      ...emptyMetricSummary(),
-      projectPath: options.cwd,
-      recent: []
-    };
-  }
-  updateMetricSummary(stats.byProject[projectHash], runStat);
-  stats.byProject[projectHash].projectPath = options.cwd;
-  if (!Array.isArray(stats.byProject[projectHash].recent)) {
-    stats.byProject[projectHash].recent = [];
-  }
-  stats.byProject[projectHash].recent.unshift(runStat);
-  if (stats.byProject[projectHash].recent.length > 50) {
-    stats.byProject[projectHash].recent = stats.byProject[projectHash].recent.slice(0, 50);
-  }
+      if (!stats.byProject[projectHash]) {
+        stats.byProject[projectHash] = {
+          ...emptyMetricSummary(),
+          projectPath: options.cwd,
+          recent: [],
+          daily: {}
+        };
+      }
+      const project = stats.byProject[projectHash];
+      updateMetricSummary(project, runStat);
+      project.projectPath = options.cwd;
+      if (!Array.isArray(project.recent)) {
+        project.recent = [];
+      }
+      project.recent.unshift(runStat);
+      if (project.recent.length > 50) {
+        project.recent = project.recent.slice(0, 50);
+      }
+      if (!project.daily) {
+        project.daily = {};
+      }
+      if (!project.daily[dateKey]) {
+        project.daily[dateKey] = emptyMetricSummary();
+      }
+      updateMetricSummary(project.daily[dateKey], runStat);
 
-  if (!stats.daily[dateKey]) {
-    stats.daily[dateKey] = emptyMetricSummary();
-  }
-  updateMetricSummary(stats.daily[dateKey], runStat);
+      if (!stats.daily[dateKey]) {
+        stats.daily[dateKey] = emptyMetricSummary();
+      }
+      updateMetricSummary(stats.daily[dateKey], runStat);
 
-  stats.recent.unshift(runStat);
-  if (stats.recent.length > 200) {
-    stats.recent = stats.recent.slice(0, 200);
-  }
+      stats.recent.unshift(runStat);
+      if (stats.recent.length > 200) {
+        stats.recent = stats.recent.slice(0, 200);
+      }
 
-  stats.updatedAt = now.toISOString();
-  await writeStatsFile(env, stats);
+      stats.updatedAt = now.toISOString();
+      await writeStatsFile(env, stats);
 
-  return runStat;
+      return runStat;
+    },
+    { timeoutMs: 10_000 }
+  );
 }
 
 export async function resetStats(
   env: NodeJS.ProcessEnv,
   options: { projectHash?: string } = {}
 ): Promise<string> {
-  const statsPath = resolveStatsPath(env);
+  return withFileLock(
+    resolveStatsLockPath(env),
+    async () => {
+      const statsPath = resolveStatsPath(env);
 
-  if (!options.projectHash) {
-    await rm(statsPath, { force: true });
-    return "Global character savings stats reset successfully.\n";
-  }
+      if (!options.projectHash) {
+        await rm(statsPath, { force: true });
+        return "Global character savings stats reset successfully.\n";
+      }
 
-  const stats = await readStatsFile(env);
-  if (stats.byProject[options.projectHash]) {
-    delete stats.byProject[options.projectHash];
-    stats.recent = stats.recent.filter(
-      (entry) => entry.projectHash !== options.projectHash
-    );
-    await writeStatsFile(env, stats);
-    return `Character savings stats reset for project ${options.projectHash}.\n`;
-  }
+      const stats = await readStatsFile(env);
+      const project = stats.byProject[options.projectHash];
 
-  return `No stats found for project ${options.projectHash}.\n`;
+      if (!project) {
+        return `No stats found for project ${options.projectHash}.\n`;
+      }
+
+      subtractMetricSummary(stats.totals, project);
+
+      for (const [dayKey, dayStat] of Object.entries(project.daily ?? {})) {
+        if (!stats.daily[dayKey]) {
+          continue;
+        }
+
+        subtractMetricSummary(stats.daily[dayKey], dayStat);
+
+        if (stats.daily[dayKey].calls <= 0) {
+          delete stats.daily[dayKey];
+        }
+      }
+
+      delete stats.byProject[options.projectHash];
+      stats.recent = stats.recent.filter(
+        (entry) => entry.projectHash !== options.projectHash
+      );
+      await writeStatsFile(env, stats);
+      return `Character savings stats reset for project ${options.projectHash}.\n`;
+    },
+    { timeoutMs: 10_000 }
+  );
 }
 
 export function formatSingleRunSummary(stat: SingleRunStat): string {
@@ -452,15 +544,33 @@ export function formatStatsReport(
   }
 
   if (options.days && options.days > 0) {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - options.days);
+    const now = options.now ?? new Date();
+    const cutoffDate = new Date(now.getTime());
+    cutoffDate.setUTCDate(cutoffDate.getUTCDate() - options.days);
     const cutoffKey = cutoffDate.toISOString().slice(0, 10);
     const cutoffIso = cutoffDate.toISOString();
 
+    const dailySource = options.projectHash
+      ? stats.byProject[options.projectHash]?.daily &&
+        Object.keys(stats.byProject[options.projectHash]?.daily ?? {}).length > 0
+        ? stats.byProject[options.projectHash].daily ?? {}
+        : (() => {
+            const reconstructed: Record<string, MetricSummary> = {};
+            for (const run of recentRuns) {
+              const dayKey = run.timestamp.slice(0, 10);
+              if (!reconstructed[dayKey]) {
+                reconstructed[dayKey] = emptyMetricSummary();
+              }
+              updateMetricSummary(reconstructed[dayKey], run);
+            }
+            return reconstructed;
+          })()
+      : stats.daily;
+
     const filteredSummary = emptyMetricSummary();
-    for (const [dayKey, dayStat] of Object.entries(stats.daily)) {
+    for (const [dayKey, dayStat] of Object.entries(dailySource)) {
       if (dayKey >= cutoffKey) {
-        updateMetricSummary(filteredSummary, dayStat);
+        addMetricSummary(filteredSummary, dayStat);
       }
     }
     targetSummary = filteredSummary;
@@ -614,6 +724,7 @@ export async function runStatsCommand(
     projectPath: context.cwd,
     days,
     json,
-    history
+    history,
+    now
   });
 }

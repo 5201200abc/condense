@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   hasPromptLikeTail,
+  hasRedrawSignal,
   looksLikeBadDistillation,
   normalizeForModel,
   structuralSimilarity
@@ -28,5 +29,17 @@ describe("text helpers", () => {
   it("treats echoed input as a bad condenseation", () => {
     const input = "x".repeat(1500);
     expect(looksLikeBadDistillation(input, input)).toBe(true);
+  });
+
+  it("does not treat CRLF as a redraw signal", () => {
+    expect(hasRedrawSignal("line one\r\nline two\r\n")).toBe(false);
+    expect(hasRedrawSignal("progress\rnext")).toBe(true);
+    expect(hasRedrawSignal("\u001b[2Jcleared")).toBe(true);
+  });
+
+  it("does not treat moderate long-input compression as a bad distillation", () => {
+    const input = "x".repeat(1500);
+    expect(looksLikeBadDistillation(input, "x".repeat(1200))).toBe(false);
+    expect(looksLikeBadDistillation(input, "x".repeat(1480))).toBe(true);
   });
 });

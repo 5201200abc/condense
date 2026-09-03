@@ -346,7 +346,9 @@ describe("condense end-to-end", () => {
   it("learns inline variable dict from thread transcript and injects it into later prompts", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "condense-e2e-var-dsl-"));
     const env = {
-      CONDENSE_CONFIG_PATH: path.join(dir, "config.json")
+      CONDENSE_CONFIG_PATH: path.join(dir, "config.json"),
+      CONDENSE_PROVIDER: "external",
+      CONDENSE_HOST: "http://127.0.0.1:9"
     };
     const fake = await createFakeChatProvider((body, index) => {
       expect(index).toBe(0);
@@ -410,7 +412,9 @@ describe("condense end-to-end", () => {
   it("promotes explicit inline variables from a thread transcript without reviewer calls", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "condense-e2e-thread-dsl-"));
     const env = {
-      CONDENSE_CONFIG_PATH: path.join(dir, "config.json")
+      CONDENSE_CONFIG_PATH: path.join(dir, "config.json"),
+      CONDENSE_PROVIDER: "external",
+      CONDENSE_HOST: "http://127.0.0.1:9"
     };
 
     try {

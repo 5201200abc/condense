@@ -1,9 +1,14 @@
 import { describe, expect, it } from "bun:test";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import type { RuntimeConfig } from "../src/config";
 import {
   buildLocalServerArgs,
   ensureLocalServer,
+  killLocalServer,
+  probeLocalServer,
   resolveLocalBackend
 } from "../src/local-server";
 
@@ -41,6 +46,10 @@ describe("local server backend selection", () => {
       "127.0.0.1",
       "--port",
       "8009",
+      "--decode-concurrency",
+      "5",
+      "--prompt-concurrency",
+      "5",
       "--prompt-cache-size",
       "0",
       "--prompt-cache-bytes",
@@ -132,5 +141,125 @@ describe("ensureLocalServer", () => {
         spawnServer: async () => undefined
       })
     ).rejects.toThrow("127.0.0.1:8009");
+  });
+
+  it("kills zombie server and restarts when probe detects zombie status", async () => {
+    const events: string[] = [];
+    let probeCount = 0;
+
+    await ensureLocalServer(localConfig(), {
+      platform: "darwin",
+      arch: "arm64",
+      probeServer: async () => {
+        probeCount += 1;
+        events.push(`probe-${probeCount}`);
+        return probeCount <= 2 ? { status: "zombie" } : { status: "ready" };
+      },
+      killServer: async () => {
+        events.push("kill");
+        return true;
+      },
+      installRuntime: async (backend) => {
+        events.push(`install-${backend}`);
+        return "/tmp/mlx_lm.server";
+      },
+      spawnServer: async (runtimePath) => {
+        events.push(`spawn-${runtimePath}`);
+      }
+    });
+
+    expect(events).toEqual([
+      "probe-1",
+      "probe-2",
+      "kill",
+      "install-mlx",
+      "spawn-/tmp/mlx_lm.server",
+      "probe-3"
+    ]);
+  });
+
+  it("does not kill a server after one transient zombie probe", async () => {
+    const events: string[] = [];
+    let probeCount = 0;
+
+    await ensureLocalServer(localConfig(), {
+      probeServer: async () => {
+        probeCount += 1;
+        events.push(`probe-${probeCount}`);
+        return probeCount === 1 ? { status: "zombie" } : { status: "ready" };
+      },
+      killServer: async () => {
+        events.push("kill");
+        return true;
+      }
+    });
+
+    expect(events).toEqual(["probe-1", "probe-2"]);
+  });
+});
+
+describe("probeLocalServer deep health check", () => {
+  it("returns ready when both models endpoint and chat completions return 200", async () => {
+    const config = localConfig();
+    const result = await probeLocalServer(config, async (url, init) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/v1/models")) {
+        return new Response(JSON.stringify({ data: [{ id: "model-1" }] }), { status: 200 });
+      }
+      if (urlStr.includes("/v1/chat/completions")) {
+        expect(init?.method).toBe("POST");
+        return new Response(JSON.stringify({ choices: [{ message: { content: "pong" } }] }), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    expect(result.status).toBe("ready");
+  });
+
+  it("returns zombie when models endpoint is 200 but chat completions fails with 500 or crash", async () => {
+    const config = localConfig();
+    const result = await probeLocalServer(config, async (url) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/v1/models")) {
+        return new Response(JSON.stringify({ data: [{ id: "model-1" }] }), { status: 200 });
+      }
+      if (urlStr.includes("/v1/chat/completions")) {
+        return new Response("Internal Server Error: thread died", { status: 500 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    expect(result.status).toBe("zombie");
+  });
+
+  it("returns down when connection fails entirely", async () => {
+    const config = localConfig();
+    const result = await probeLocalServer(config, async () => {
+      throw new Error("Connection refused");
+    });
+
+    expect(result.status).toBe("down");
+  });
+});
+
+describe("killLocalServer", () => {
+  it("cleans up dead PID file safely", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-kill-test-"));
+    const configPath = path.join(dir, "config.json");
+    const pidPath = path.join(dir, "logs", "local-server.pid");
+    const env = { CONDENSE_CONFIG_PATH: configPath };
+
+    try {
+      await mkdir(path.dirname(pidPath), { recursive: true });
+      await writeFile(pidPath, "99999999\n");
+      const result = await killLocalServer(env);
+      expect(result).toBe(true);
+      await expect(readFile(pidPath, "utf8")).rejects.toThrow();
+
+      const secondResult = await killLocalServer(env);
+      expect(secondResult).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

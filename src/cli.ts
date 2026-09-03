@@ -5,6 +5,7 @@ import {
   parseCommand,
   resolveRuntimeDefaults
 } from "./config";
+import { stdinIsTTY, stdoutIsTTY, stderrIsTTY } from "./tty";
 import {
   formatPromptDslMemory,
   learnFromCondenseOutput,
@@ -20,7 +21,7 @@ import {
   summarizeTranslate,
   summarizeWatch
 } from "./llm";
-import { runOnboarding } from "./onboarding";
+import { runOnboarding, warmupLocalModel } from "./onboarding";
 import { runStatsCommand } from "./stats";
 import { CondenseSession, type ProgressPhase } from "./stream-condenser";
 import { resolveDatasetPath } from "./dataset";
@@ -94,10 +95,17 @@ export async function runUpgradeCommand(): Promise<string> {
 
 async function run(): Promise<number> {
   const persisted = await readPersistedConfig(process.env);
-  const command = parseCommand(process.argv.slice(2), process.env, persisted);
+  const command = parseCommand(process.argv.slice(2), process.env, persisted, {
+    stdinIsTTY: stdinIsTTY()
+  });
 
   if (command.kind === "onboard") {
     await runOnboarding({ env: process.env, persisted });
+    return 0;
+  }
+
+  if (command.kind === "warmup") {
+    await warmupLocalModel({ env: process.env, persisted });
     return 0;
   }
 
@@ -245,9 +253,9 @@ async function run(): Promise<number> {
   );
   const progress = progressProtocol
     ? undefined
-    : process.stderr.isTTY
+    : stderrIsTTY()
       ? process.stderr
-      : process.stdout.isTTY
+      : stdoutIsTTY()
         ? process.stdout
         : undefined;
   const emitProgressPhase = progressProtocol
@@ -274,7 +282,7 @@ async function run(): Promise<number> {
     },
     stdout: process.stdout,
     stderr: process.stderr,
-    isTTY: Boolean(process.stdout.isTTY),
+    isTTY: stdoutIsTTY(),
     progress,
     onProgressPhase: emitProgressPhase,
     onProgressStop: emitProgressStop,

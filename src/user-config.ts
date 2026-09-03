@@ -1,9 +1,15 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { ConfigKey, PersistedConfig } from "./config";
+import { coerceBoolean, type ConfigKey, type PersistedConfig } from "./config";
 
 export function resolveConfigBaseDir(env: NodeJS.ProcessEnv): string {
+  const explicit = env.CONDENSE_CONFIG_PATH?.trim();
+
+  if (explicit) {
+    return path.dirname(explicit);
+  }
+
   const appData = env.APPDATA?.trim();
 
   if (appData) {
@@ -38,7 +44,7 @@ export function resolveConfigBaseDir(env: NodeJS.ProcessEnv): string {
 }
 
 export function resolveConfigPath(env: NodeJS.ProcessEnv): string {
-  const explicit = (env.CONDENSE_CONFIG_PATH ?? env.DISTILL_CONFIG_PATH)?.trim();
+  const explicit = env.CONDENSE_CONFIG_PATH?.trim();
 
   if (explicit) {
     return explicit;
@@ -75,8 +81,13 @@ export async function writePersistedConfig(
   config: PersistedConfig
 ): Promise<void> {
   const configPath = resolveConfigPath(env);
-  await mkdir(path.dirname(configPath), { recursive: true });
-  await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  const configDir = path.dirname(configPath);
+  await mkdir(configDir, { recursive: true, mode: 0o700 });
+  await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, {
+    mode: 0o600
+  });
+  await chmod(configDir, 0o700);
+  await chmod(configPath, 0o600);
 }
 
 export async function setPersistedConfigValue(
@@ -99,13 +110,13 @@ export async function setPersistedConfigValue(
   } else if (key === "local-port") {
     current.localPort = Number(value);
   } else if (key === "dataset-enabled") {
-    current.datasetEnabled = Boolean(value);
+    current.datasetEnabled = coerceBoolean(value);
   } else if (key === "dataset-path") {
     current.datasetPath = String(value);
   } else if (key === "auto-learn") {
-    current.autoLearn = Boolean(value);
+    current.autoLearn = coerceBoolean(value);
   } else if (key === "auto-promote-scopes") {
-    current.autoPromoteScopes = Boolean(value);
+    current.autoPromoteScopes = coerceBoolean(value);
   } else if (key === "max-prompt-dsl-entries") {
     current.maxPromptDslEntries = Number(value);
   } else if (key === "host") {

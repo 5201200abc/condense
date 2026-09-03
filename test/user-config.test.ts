@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -77,6 +77,22 @@ describe("user config", () => {
         localConcurrency: 5,
         localHost: "127.0.0.1",
         localPort: 8009
+      });
+      expect((await stat(configPath)).mode & 0o777).toBe(0o600);
+
+      await setPersistedConfigValue(
+        { CONDENSE_CONFIG_PATH: configPath },
+        "dataset-enabled",
+        "false"
+      );
+      await setPersistedConfigValue(
+        { CONDENSE_CONFIG_PATH: configPath },
+        "auto-learn",
+        "false"
+      );
+      expect(await readPersistedConfig({ CONDENSE_CONFIG_PATH: configPath })).toMatchObject({
+        datasetEnabled: false,
+        autoLearn: false
       });
     } finally {
       await rm(dir, { recursive: true, force: true });

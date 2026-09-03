@@ -5,7 +5,7 @@ import { getCurrentPlatformKey, selectPlatformTargets } from "./platform-targets
 const root = path.resolve(import.meta.dir, "..");
 const currentTargetKey = getCurrentPlatformKey();
 const selectedTargets = selectPlatformTargets({
-  buildAll: process.env.CONDENSE_BUILD_ALL === "1" || process.env.DISTILL_BUILD_ALL === "1"
+  buildAll: process.env.CONDENSE_BUILD_ALL === "1"
 });
 
 if (selectedTargets.length === 0) {

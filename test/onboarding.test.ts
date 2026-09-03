@@ -5,7 +5,7 @@ import path from "node:path";
 import { Readable, Writable } from "node:stream";
 
 import type { RuntimeConfig } from "../src/config";
-import { runOnboarding } from "../src/onboarding";
+import { runOnboarding, warmupLocalModel } from "../src/onboarding";
 
 function captureOutput(): { output: Writable; read: () => string } {
   let text = "";
@@ -46,9 +46,9 @@ describe("onboarding", () => {
         }
       });
 
-      expect(read()).toContain("(0%) Downloading and loading Distill local model");
-      expect(read()).toContain("(1%) Downloading and loading Distill local model");
-      expect(read()).toContain("Local Distill model ready");
+      expect(read()).toContain("(0%) Downloading and loading Condense local model");
+      expect(read()).toContain("(1%) Downloading and loading Condense local model");
+      expect(read()).toContain("Local Condense model ready");
       expect(warmedConfig?.provider).toBe("local");
       expect(warmedConfig?.localConcurrency).toBe(2);
       expect(warmedConfig?.host).toBe("http://127.0.0.1:19009/v1");
@@ -62,5 +62,48 @@ describe("onboarding", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("warms the local model without interactive onboarding", async () => {
+    const { output, read } = captureOutput();
+    let warmedConfig: RuntimeConfig | null = null;
+
+    await warmupLocalModel({
+      env: process.env,
+      persisted: {
+        provider: "local",
+        localHost: "127.0.0.1",
+        localPort: 19009
+      },
+      output,
+      prepareLocalModel: async (config, onProgress) => {
+        warmedConfig = config;
+        onProgress?.(1);
+      }
+    });
+
+    expect(read()).toContain("(0%) Downloading and loading Condense local model");
+    expect(read()).toContain("(1%) Downloading and loading Condense local model");
+    expect(read()).toContain("Local Condense model ready");
+    expect(warmedConfig?.provider).toBe("local");
+    expect(warmedConfig?.localHost).toBe("127.0.0.1");
+    expect(warmedConfig?.localPort).toBe(19009);
+  });
+
+  it("skips warmup when provider is external", async () => {
+    const { output, read } = captureOutput();
+    let prepared = false;
+
+    await warmupLocalModel({
+      env: process.env,
+      persisted: { provider: "external" },
+      output,
+      prepareLocalModel: async () => {
+        prepared = true;
+      }
+    });
+
+    expect(prepared).toBe(false);
+    expect(read()).toContain("condense warmup skipped: provider is not local.");
   });
 });

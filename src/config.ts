@@ -1,7 +1,6 @@
 import cliPackage from "../packages/cli/package.json";
 
 export const CONDENSE_VERSION = cliPackage.version;
-export const DISTILL_VERSION = CONDENSE_VERSION;
 
 export const DEFAULT_MODEL = "qwen3.5:2b";
 export const DEFAULT_HOST = "http://127.0.0.1:11434/v1";
@@ -12,9 +11,7 @@ export const DEFAULT_LOCAL_CONCURRENCY = 5;
 export const DEFAULT_LOCAL_HOST = "127.0.0.1";
 export const DEFAULT_LOCAL_PORT = 8009;
 export const CONDENSE_MLX_MODEL = "samuelfaj/distill2-0.6B-4bit-MLX";
-export const DISTILL_MLX_MODEL = CONDENSE_MLX_MODEL;
 export const CONDENSE_LLAMA_MODEL = "condense-local";
-export const DISTILL_LLAMA_MODEL = CONDENSE_LLAMA_MODEL;
 export const DEFAULT_IDLE_MS = 1_200;
 export const DEFAULT_INTERACTIVE_GAP_MS = 180;
 export const DEFAULT_PROGRESS_FRAME_MS = 120;
@@ -28,7 +25,7 @@ export const DEFAULT_MAX_PROMPT_DSL_ENTRIES = 40;
 export type Provider = "local" | "external";
 export type LocalBackend = "auto" | "mlx" | "llamacpp";
 
-export interface DistillSettings {
+export interface CondenseSettings {
   provider: Provider;
   localBackend: LocalBackend;
   localConcurrency: number;
@@ -48,11 +45,11 @@ export interface DistillSettings {
   showStats?: boolean;
 }
 
-export interface RuntimeConfig extends DistillSettings {
+export interface RuntimeConfig extends CondenseSettings {
   question: string;
 }
 
-export type PersistedConfig = Partial<DistillSettings>;
+export type PersistedConfig = Partial<CondenseSettings>;
 
 export type ConfigKey =
   | "provider"
@@ -72,6 +69,7 @@ export type ConfigKey =
 
 export type Command =
   | { kind: "onboard" }
+  | { kind: "warmup" }
   | { kind: "help" }
   | { kind: "version" }
   | { kind: "upgrade" }
@@ -148,7 +146,7 @@ function normalizeLocalHost(input: string | undefined): string {
   return value;
 }
 
-function coerceBoolean(input: string | boolean | undefined): boolean {
+export function coerceBoolean(input: string | boolean | undefined): boolean {
   if (typeof input === "boolean") {
     return input;
   }
@@ -244,72 +242,80 @@ function resolveLocalModel(
     : CONDENSE_LLAMA_MODEL;
 }
 
+export function bracketIpv6Host(host: string): string {
+  if (host.includes(":") && !host.startsWith("[")) {
+    return `[${host}]`;
+  }
+
+  return host;
+}
+
 function resolveLocalHost(localHost: string, localPort: number): string {
-  return `http://${localHost}:${localPort}/v1`;
+  return `http://${bracketIpv6Host(localHost)}:${localPort}/v1`;
 }
 
 export function resolveRuntimeDefaults(
   env: NodeJS.ProcessEnv,
   persisted: PersistedConfig
-): DistillSettings {
+): CondenseSettings {
   const hasExternalEnv = Boolean(
-    (env.CONDENSE_HOST ?? env.DISTILL_HOST) || (env.CONDENSE_MODEL ?? env.DISTILL_MODEL) || (env.CONDENSE_API_KEY ?? env.DISTILL_API_KEY)
+    env.CONDENSE_HOST || env.CONDENSE_MODEL || env.CONDENSE_API_KEY
   );
-  const provider = (env.CONDENSE_PROVIDER ?? env.DISTILL_PROVIDER)
-    ? coerceProvider((env.CONDENSE_PROVIDER ?? env.DISTILL_PROVIDER))
+  const provider = env.CONDENSE_PROVIDER
+    ? coerceProvider(env.CONDENSE_PROVIDER)
     : hasExternalEnv
       ? "external"
     : persisted.provider
       ? coercePersistedProvider(persisted.provider)
       : DEFAULT_PROVIDER;
-  const localBackend = (env.CONDENSE_LOCAL_BACKEND ?? env.DISTILL_LOCAL_BACKEND)
-    ? coerceLocalBackend((env.CONDENSE_LOCAL_BACKEND ?? env.DISTILL_LOCAL_BACKEND))
+  const localBackend = env.CONDENSE_LOCAL_BACKEND
+    ? coerceLocalBackend(env.CONDENSE_LOCAL_BACKEND)
     : coercePersistedLocalBackend(persisted.localBackend);
   const localConcurrency = coercePositiveInteger(
-    (env.CONDENSE_LOCAL_CONCURRENCY ?? env.DISTILL_LOCAL_CONCURRENCY) ??
+    env.CONDENSE_LOCAL_CONCURRENCY ??
       persisted.localConcurrency ??
       DEFAULT_LOCAL_CONCURRENCY,
     "local-concurrency"
   );
   const localHost = normalizeLocalHost(
-    (env.CONDENSE_LOCAL_HOST ?? env.DISTILL_LOCAL_HOST) ?? persisted.localHost ?? DEFAULT_LOCAL_HOST
+    env.CONDENSE_LOCAL_HOST ?? persisted.localHost ?? DEFAULT_LOCAL_HOST
   );
   const localPort = coercePort(
-    (env.CONDENSE_LOCAL_PORT ?? env.DISTILL_LOCAL_PORT) ?? persisted.localPort ?? DEFAULT_LOCAL_PORT,
+    env.CONDENSE_LOCAL_PORT ?? persisted.localPort ?? DEFAULT_LOCAL_PORT,
     "local-port"
   );
   const model =
     provider === "local"
       ? resolveLocalModel(localBackend)
-      : (env.CONDENSE_MODEL ?? env.DISTILL_MODEL) ?? persisted.model ?? DEFAULT_MODEL;
+      : env.CONDENSE_MODEL ?? persisted.model ?? DEFAULT_MODEL;
   const host =
     provider === "local"
       ? resolveLocalHost(localHost, localPort)
-      : normalizeHost((env.CONDENSE_HOST ?? env.DISTILL_HOST) ?? persisted.host ?? DEFAULT_HOST);
-  const apiKey = provider === "local" ? "" : (env.CONDENSE_API_KEY ?? env.DISTILL_API_KEY) ?? persisted.apiKey ?? "";
+      : normalizeHost(env.CONDENSE_HOST ?? persisted.host ?? DEFAULT_HOST);
+  const apiKey = provider === "local" ? "" : env.CONDENSE_API_KEY ?? persisted.apiKey ?? "";
   const timeoutMs = coerceTimeout(
-    (env.CONDENSE_TIMEOUT_MS ?? env.DISTILL_TIMEOUT_MS) ?? String(persisted.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+    env.CONDENSE_TIMEOUT_MS ?? String(persisted.timeoutMs ?? DEFAULT_TIMEOUT_MS)
   );
   const datasetEnabled = coerceBoolean(
-    (env.CONDENSE_DATASET_ENABLED ?? env.DISTILL_DATASET_ENABLED) ?? persisted.datasetEnabled
+    env.CONDENSE_DATASET_ENABLED ?? persisted.datasetEnabled
   );
-  const datasetPath = (env.CONDENSE_DATASET_PATH ?? env.DISTILL_DATASET_PATH) ?? persisted.datasetPath;
+  const datasetPath = env.CONDENSE_DATASET_PATH ?? persisted.datasetPath;
   const autoLearn = coerceBoolean(
-    (env.CONDENSE_AUTO_LEARN ?? env.DISTILL_AUTO_LEARN) ?? persisted.autoLearn ?? DEFAULT_AUTO_LEARN
+    env.CONDENSE_AUTO_LEARN ?? persisted.autoLearn ?? DEFAULT_AUTO_LEARN
   );
   const autoPromoteScopes = coerceBoolean(
-    (env.CONDENSE_AUTO_PROMOTE_SCOPES ?? env.DISTILL_AUTO_PROMOTE_SCOPES) ??
+    env.CONDENSE_AUTO_PROMOTE_SCOPES ??
       persisted.autoPromoteScopes ??
       DEFAULT_AUTO_PROMOTE_SCOPES
   );
   const maxPromptDslEntries = coercePositiveInteger(
-    (env.CONDENSE_MAX_PROMPT_DSL_ENTRIES ?? env.DISTILL_MAX_PROMPT_DSL_ENTRIES) ??
+    env.CONDENSE_MAX_PROMPT_DSL_ENTRIES ??
       persisted.maxPromptDslEntries ??
       DEFAULT_MAX_PROMPT_DSL_ENTRIES,
     "max-prompt-dsl-entries"
   );
   const showStats = coerceBoolean(
-    (env.CONDENSE_SHOW_STATS ?? env.DISTILL_SHOW_STATS) ?? persisted.showStats ?? false
+    env.CONDENSE_SHOW_STATS ?? persisted.showStats ?? false
   );
 
   return {
@@ -461,9 +467,22 @@ function parseConfigCommand(argv: string[]): Command {
 export function parseCommand(
   argv: string[],
   env: NodeJS.ProcessEnv,
-  persisted: PersistedConfig = {}
+  persisted: PersistedConfig = {},
+  options: { stdinIsTTY?: boolean } = {}
 ): Command {
+  if (argv[0] === "onboard") {
+    return { kind: "onboard" };
+  }
+
+  if (argv[0] === "warmup") {
+    return { kind: "warmup" };
+  }
+
   if (argv.length === 0) {
+    if (options.stdinIsTTY === false) {
+      throw new UsageError("A question is required.");
+    }
+
     return { kind: "onboard" };
   }
 
@@ -594,15 +613,15 @@ export function parseCommand(
     modelOverride || hostOverride || apiKeyOverride ? "external" : defaults.provider;
   const model =
     provider === "external"
-      ? modelOverride ?? (env.CONDENSE_MODEL ?? env.DISTILL_MODEL) ?? persisted.model ?? DEFAULT_MODEL
+      ? modelOverride ?? env.CONDENSE_MODEL ?? persisted.model ?? DEFAULT_MODEL
       : defaults.model;
   const host =
     provider === "external"
-      ? normalizeHost(hostOverride ?? (env.CONDENSE_HOST ?? env.DISTILL_HOST) ?? persisted.host ?? DEFAULT_HOST)
+      ? normalizeHost(hostOverride ?? env.CONDENSE_HOST ?? persisted.host ?? DEFAULT_HOST)
       : defaults.host;
   const apiKey =
     provider === "external"
-      ? apiKeyOverride ?? (env.CONDENSE_API_KEY ?? env.DISTILL_API_KEY) ?? persisted.apiKey ?? ""
+      ? apiKeyOverride ?? env.CONDENSE_API_KEY ?? persisted.apiKey ?? ""
       : "";
 
   return {
@@ -641,6 +660,8 @@ export function formatUsage(): string {
     "  condense stats --json",
     "  condense stats --days 7",
     "  condense stats --reset",
+    "  condense onboard",
+    "  condense warmup",
     "  condense update",
     "  condense dsl show",
     "  condense dsl show --candidates",

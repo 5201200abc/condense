@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import {
   getCurrentPlatformKey,
   getPlatformTarget,
@@ -51,5 +53,17 @@ describe("platform targets", () => {
     );
     expect(windowsTarget?.os).toEqual(["win32"]);
     expect(windowsTarget?.cpu).toEqual(["x64"]);
+  });
+
+  it("commits os/cpu metadata on every platform package", async () => {
+    const root = path.resolve(import.meta.dir, "..");
+
+    for (const target of PLATFORM_TARGETS) {
+      const manifest = JSON.parse(
+        await readFile(path.join(root, target.packageManifestPath), "utf8")
+      ) as { os?: string[]; cpu?: string[] };
+      expect(manifest.os).toEqual([...target.os]);
+      expect(manifest.cpu).toEqual([...target.cpu]);
+    }
   });
 });

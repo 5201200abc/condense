@@ -1,11 +1,12 @@
 import type { RuntimeConfig } from "./config";
-import { ensureLocalServer } from "./local-server";
+import { ensureLocalServer, killLocalServer } from "./local-server";
 import {
   buildBatchPrompt,
   buildDslPromotionPrompt,
   buildThreadLearnPrompt,
   buildTranslatePrompt,
   buildWatchPrompt,
+  LOCAL_MAX_INPUT_CHARS,
   type PromptMessages
 } from "./prompt";
 
@@ -23,6 +24,7 @@ export interface ChatCompletionRequest {
 interface SummarizeOptions {
   dslMemory?: string;
   ensureLocalServer?: (config: RuntimeConfig) => Promise<void>;
+  killLocalServer?: (env: NodeJS.ProcessEnv) => Promise<boolean>;
 }
 
 interface LocalRequestGate {
@@ -177,7 +179,8 @@ async function summarize(
   config: RuntimeConfig,
   prompt: PromptMessages,
   fetchImpl?: typeof fetch,
-  ensureLocalServerImpl: (config: RuntimeConfig) => Promise<void> = ensureLocalServer
+  ensureLocalServerImpl: (config: RuntimeConfig) => Promise<void> = ensureLocalServer,
+  killLocalServerImpl: (env: NodeJS.ProcessEnv) => Promise<boolean> = killLocalServer
 ): Promise<string> {
   if (config.provider === "local") {
     await ensureLocalServerImpl(config);
@@ -195,9 +198,25 @@ async function summarize(
       fetchImpl
     });
 
-  return config.provider === "local"
-    ? withLocalRequestGate(config, request)
-    : request();
+  if (config.provider !== "local") {
+    return request();
+  }
+
+  return withLocalRequestGate(config, async () => {
+    try {
+      return await request();
+    } catch {
+      await killLocalServerImpl(process.env).catch(() => {});
+      await ensureLocalServerImpl(config);
+    }
+
+    try {
+      return await request();
+    } catch (error) {
+      await killLocalServerImpl(process.env).catch(() => {});
+      throw error;
+    }
+  });
 }
 
 export function summarizeBatch(
@@ -210,12 +229,20 @@ export function summarizeBatch(
     typeof optionsOrFetchImpl === "function" ? {} : optionsOrFetchImpl;
   const resolvedFetchImpl =
     typeof optionsOrFetchImpl === "function" ? optionsOrFetchImpl : fetchImpl;
+  const promptOptions = {
+    ...options,
+    maxInputChars:
+      config.provider === "local"
+        ? Math.min(options.maxInputChars ?? LOCAL_MAX_INPUT_CHARS, LOCAL_MAX_INPUT_CHARS)
+        : options.maxInputChars
+  };
 
   return summarize(
     config,
-    buildBatchPrompt(config.question, input, options),
+    buildBatchPrompt(config.question, input, promptOptions),
     resolvedFetchImpl,
-    options.ensureLocalServer
+    options.ensureLocalServer,
+    options.killLocalServer
   );
 }
 
@@ -236,7 +263,12 @@ export function summarizeWatch(
 ): Promise<string> {
   return summarize(
     config,
-    buildWatchPrompt(config.question, previousCycle, currentCycle),
+    buildWatchPrompt(
+      config.question,
+      previousCycle,
+      currentCycle,
+      config.provider === "local" ? LOCAL_MAX_INPUT_CHARS / 2 : undefined
+    ),
     fetchImpl
   );
 }

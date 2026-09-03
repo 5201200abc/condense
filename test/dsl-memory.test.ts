@@ -7,7 +7,7 @@ import {
   formatPromptDslMemory,
   hashProjectPath,
   learnFromThreadTranscript,
-  learnFromDistillOutput,
+  learnFromCondenseOutput,
   readMergedDslMemory,
   resolveDslScopePath,
   runDslCommand,
@@ -85,13 +85,13 @@ describe("dsl memory", () => {
 
   it("learns reusable Dict+ entries from condense output into project candidates", async () => {
     await withEnv(async (env, cwd) => {
-      const first = await learnFromDistillOutput(
+      const first = await learnFromCondenseOutput(
         env,
         cwd,
         "Out: done\nDict+:\nAUTH = authentication fix\n",
         { now: daysFromNow(0) }
       );
-      const second = await learnFromDistillOutput(
+      const second = await learnFromCondenseOutput(
         env,
         cwd,
         "Out: done\nDict+: AUTH=authentication fix\n",
@@ -111,7 +111,7 @@ describe("dsl memory", () => {
 
   it("does not persist inline variable assignments from single condense output", async () => {
     await withEnv(async (env, cwd) => {
-      const output = await learnFromDistillOutput(
+      const output = await learnFromCondenseOutput(
         env,
         cwd,
         [
@@ -134,7 +134,7 @@ describe("dsl memory", () => {
 
   it("does not learn sensitive, path-heavy, or value-like Dict+ entries", async () => {
     await withEnv(async (env, cwd) => {
-      const output = await learnFromDistillOutput(
+      const output = await learnFromCondenseOutput(
         env,
         cwd,
         [
@@ -563,6 +563,73 @@ describe("dsl memory", () => {
       });
 
       expect(evicted).toContain("evicted 1 entries");
+      expect(output).toContain("(empty)");
+    });
+  });
+
+  it("does not evict on learn-thread dry-run", async () => {
+    await withEnv(async (env, cwd) => {
+      await learnFromThreadTranscript(
+        env,
+        cwd,
+        [
+          "S cache=#c1 prepared",
+          "D inspect #c1",
+          "D warm #c1",
+          "D compare #c1",
+          "D reuse #c1",
+          "D keep #c1"
+        ].join("\n"),
+        { now: daysFromNow(0) }
+      );
+
+      const dryRun = await learnFromThreadTranscript(
+        env,
+        cwd,
+        "S unrelated thread only\nD no relevant mention",
+        { now: daysFromNow(1), dryRun: true }
+      );
+      const output = await runDslCommand(["show", "--scope", "project"], {
+        env,
+        cwd,
+        now: daysFromNow(1)
+      });
+
+      expect(dryRun).toContain("would evict 1 entries");
+      expect(output).toContain("#c1\talias\tactive\tcache");
+    });
+  });
+
+  it("uses the provided thread reviewer instead of deterministic acceptance", async () => {
+    await withEnv(async (env, cwd) => {
+      let reviewerCalls = 0;
+      const result = await learnFromThreadTranscript(
+        env,
+        cwd,
+        [
+          "S cache=#c1 prepared",
+          "D inspect #c1",
+          "D warm #c1",
+          "D compare #c1",
+          "D reuse #c1",
+          "D keep #c1"
+        ].join("\n"),
+        {
+          now: daysFromNow(0),
+          reviewer: async () => {
+            reviewerCalls += 1;
+            return [];
+          }
+        }
+      );
+      const output = await runDslCommand(["show", "--scope", "project"], {
+        env,
+        cwd,
+        now: daysFromNow(0)
+      });
+
+      expect(reviewerCalls).toBe(1);
+      expect(result).toContain("learn-thread 0 entries");
       expect(output).toContain("(empty)");
     });
   });

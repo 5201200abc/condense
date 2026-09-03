@@ -123,7 +123,7 @@ export function hashProjectPath(projectPath: string): string {
 function detectStack(cwd: string): string {
   const basename = path.basename(cwd).toLowerCase();
 
-  if (basename.includes("condense") || basename.includes("distill")) {
+  if (basename.includes("condense")) {
     return "node";
   }
 
@@ -807,7 +807,7 @@ function extractRepeatedLineCommands(transcript: string): Array<{ meaning: strin
       continue;
     }
 
-    if (!/\b(bun|npm|pnpm|yarn|git|gh|glab|terraform|condense|distill|pytest|cargo|go|swift|xcodebuild)\b/.test(line)) {
+    if (!/\b(bun|npm|pnpm|yarn|git|gh|glab|terraform|condense|pytest|cargo|go|swift|xcodebuild)\b/.test(line)) {
       continue;
     }
 
@@ -1083,8 +1083,16 @@ function evictAbsentLearnedEntries(memory: DslMemoryFile, transcript: string): {
   };
 }
 
-function formatLearnThreadResult(evictedCount: number, body: string): string {
-  return evictedCount > 0 ? `evicted ${evictedCount} entries\n${body}` : body;
+function formatLearnThreadResult(
+  evictedCount: number,
+  body: string,
+  dryRun = false
+): string {
+  if (evictedCount <= 0) {
+    return body;
+  }
+
+  return `${dryRun ? "would evict" : "evicted"} ${evictedCount} entries\n${body}`;
 }
 
 export async function learnFromThreadTranscript(
@@ -1118,7 +1126,7 @@ export async function learnFromThreadTranscript(
     transcript
   );
 
-  if (evictedCount > 0) {
+  if (evictedCount > 0 && !options.dryRun) {
     await writeMemoryFile(resolved.path, { ...targetMemory, updatedAt: iso(now) });
   }
 
@@ -1138,11 +1146,30 @@ export async function learnFromThreadTranscript(
   if (compacted.length === 0) {
     return formatLearnThreadResult(
       evictedCount,
-      `${options.dryRun ? "would learn-thread" : "learn-thread"} 0 entries\n`
+      `${options.dryRun ? "would learn-thread" : "learn-thread"} 0 entries\n`,
+      options.dryRun
     );
   }
 
-  const reviewed = deterministicThreadReviews(compacted);
+  let reviewed = deterministicThreadReviews(compacted);
+
+  if (options.reviewer) {
+    try {
+      const reviewedByModel = await options.reviewer({
+        transcript,
+        candidates: compacted,
+        dslMemory: mergedMemory,
+        scope,
+        stack: options.stack
+      });
+
+      if (Array.isArray(reviewedByModel)) {
+        reviewed = reviewedByModel;
+      }
+    } catch {
+      reviewed = deterministicThreadReviews(compacted);
+    }
+  }
 
   const pinnedKeys = new Set(
     allExisting
@@ -1184,7 +1211,8 @@ export async function learnFromThreadTranscript(
   if (approved.length === 0) {
     return formatLearnThreadResult(
       evictedCount,
-      `${options.dryRun ? "would learn-thread" : "learn-thread"} 0 entries\n`
+      `${options.dryRun ? "would learn-thread" : "learn-thread"} 0 entries\n`,
+      options.dryRun
     );
   }
 
@@ -1196,7 +1224,8 @@ export async function learnFromThreadTranscript(
         (entry) =>
           `${entry.key}\t${entry.kind}\t${entry.scope}\t${entry.confidence.toFixed(2)}\t${entry.meaning}\t${entry.reason}`
       )
-      .join("\n")}\n`
+      .join("\n")}\n`,
+      true
     );
   }
 
@@ -1219,7 +1248,7 @@ export async function learnFromThreadTranscript(
     );
   }
 
-  return formatLearnThreadResult(evictedCount, `${results.join("\n")}\n`);
+  return formatLearnThreadResult(evictedCount, `${results.join("\n")}\n`, false);
 }
 
 async function pinEntry(
@@ -1601,4 +1630,4 @@ export async function runDslCommand(
   );
 }
 
-export const learnFromDistillOutput = learnFromCondenseOutput;
+

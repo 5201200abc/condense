@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "distill-workspace",
+      "name": "condense-workspace",
       "devDependencies": {
         "@clack/prompts": "0.11.0",
       },
@@ -13,7 +13,6 @@
       "version": "1.5.2",
       "bin": {
         "condense": "bin/condense.js",
-        "distill": "bin/distill.js",
       },
       "optionalDependencies": {
         "condense-darwin-arm64": "1.5.2",

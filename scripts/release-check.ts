@@ -7,14 +7,14 @@ import {
 } from "./platform-targets";
 
 const root = path.resolve(import.meta.dir, "..");
-const requirePublishMetadata = Bun.argv.includes("--publish");
+const requireAllBinaries = Bun.argv.includes("--publish");
 const currentPlatformKey = getCurrentPlatformKey();
 const workspacePackages = [
   "packages/cli/package.json",
   ...PLATFORM_TARGETS.map((target) => target.packageManifestPath)
 ];
 
-const binaries = requirePublishMetadata
+const binaries = requireAllBinaries
   ? PLATFORM_TARGETS.map((target) => target.packageBinaryPath)
   : [getPlatformTarget(currentPlatformKey)?.packageBinaryPath].filter(Boolean);
 
@@ -45,10 +45,10 @@ if (cliManifest.name !== "condense") {
   throw new Error("Main package name must be condense.");
 }
 
-if (requirePublishMetadata) {
-  for (const manifest of manifests.slice(1) as Array<Record<string, unknown>>) {
-    if (!Array.isArray(manifest.os) || !Array.isArray(manifest.cpu)) {
-      throw new Error("Platform packages must include os/cpu metadata in publish mode.");
-    }
+for (const manifest of manifests.slice(1) as Array<Record<string, unknown>>) {
+  if (!Array.isArray(manifest.os) || !Array.isArray(manifest.cpu)) {
+    throw new Error(
+      `Platform package ${String(manifest.name)} must include os/cpu metadata.`
+    );
   }
 }

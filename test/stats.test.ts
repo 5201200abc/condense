@@ -16,6 +16,7 @@ import {
 } from "../src/stats";
 import { CondenseSession } from "../src/stream-condenser";
 import { UsageError } from "../src/config";
+import { hashProjectPath } from "../src/dsl-memory";
 
 const EMOJI_REGEX =
   /[\u{1F300}-\u{1F5FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/u;
@@ -342,7 +343,119 @@ describe("stats module", () => {
       expect(stderrOutput).toContain("% chars saved");
       expect(EMOJI_REGEX.test(stderrOutput)).toBe(false);
     } finally {
-      process.env.CONDENSE_CONFIG_PATH = prevEnv;
+      if (prevEnv === undefined) {
+        delete process.env.CONDENSE_CONFIG_PATH;
+      } else {
+        process.env.CONDENSE_CONFIG_PATH = prevEnv;
+      }
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("persists per-project recent history across reloads", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-stats-test-"));
+    const env = { CONDENSE_CONFIG_PATH: path.join(dir, "config.json") };
+
+    try {
+      await recordCondenseRun(env, {
+        cwd: "/project-a",
+        question: "a1?",
+        rawInput: "aaaa",
+        output: "a",
+        durationMs: 10,
+        now: new Date("2026-08-20T12:00:00.000Z")
+      });
+      await recordCondenseRun(env, {
+        cwd: "/project-b",
+        question: "b1?",
+        rawInput: "bbbb",
+        output: "b",
+        durationMs: 10,
+        now: new Date("2026-08-21T12:00:00.000Z")
+      });
+      await recordCondenseRun(env, {
+        cwd: "/project-a",
+        question: "a2?",
+        rawInput: "aaaaaa",
+        output: "aa",
+        durationMs: 10,
+        now: new Date("2026-08-22T12:00:00.000Z")
+      });
+
+      const stats = await readStatsFile(env);
+      const hashA = hashProjectPath("/project-a");
+      const hashB = hashProjectPath("/project-b");
+      expect(stats.byProject[hashA].recent).toHaveLength(2);
+      expect(stats.byProject[hashB].recent).toHaveLength(1);
+      expect(stats.byProject[hashA].recent?.map((entry) => entry.question)).toEqual([
+        "a2?",
+        "a1?"
+      ]);
+
+      const projectReport = await runStatsCommand(["--project", "--history"], {
+        env,
+        cwd: "/project-a"
+      });
+      expect(projectReport).toContain("a2?");
+      expect(projectReport).toContain("a1?");
+      expect(projectReport).not.toContain("b1?");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("sums daily call counts for --days and keeps project days scoped", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-stats-test-"));
+    const env = { CONDENSE_CONFIG_PATH: path.join(dir, "config.json") };
+    const now = new Date("2026-08-27T12:00:00.000Z");
+
+    try {
+      for (let index = 0; index < 5; index += 1) {
+        await recordCondenseRun(env, {
+          cwd: "/project-a",
+          question: `a-${index}?`,
+          rawInput: "input-a",
+          output: "a",
+          durationMs: 100,
+          now: new Date("2026-08-20T12:00:00.000Z")
+        });
+      }
+
+      for (let index = 0; index < 3; index += 1) {
+        await recordCondenseRun(env, {
+          cwd: "/project-b",
+          question: `b-${index}?`,
+          rawInput: "input-b",
+          output: "b",
+          durationMs: 50,
+          now: new Date("2026-08-25T12:00:00.000Z")
+        });
+      }
+
+      const globalDays = await runStatsCommand(["--days", "7", "--json"], {
+        env,
+        cwd: "/project-a",
+        now
+      });
+      const globalParsed = JSON.parse(globalDays) as { summary: { calls: number } };
+      expect(globalParsed.summary.calls).toBe(8);
+
+      const projectDays = await runStatsCommand(["--project", "--days", "7", "--json"], {
+        env,
+        cwd: "/project-a",
+        now
+      });
+      const projectParsed = JSON.parse(projectDays) as { summary: { calls: number } };
+      expect(projectParsed.summary.calls).toBe(5);
+
+      const hashA = hashProjectPath("/project-a");
+      await resetStats(env, { projectHash: hashA });
+      const afterReset = await readStatsFile(env, now);
+      expect(afterReset.totals.calls).toBe(3);
+      expect(afterReset.byProject[hashA]).toBeUndefined();
+      expect(afterReset.daily["2026-08-20"]).toBeUndefined();
+      expect(afterReset.daily["2026-08-25"].calls).toBe(3);
+    } finally {
       await rm(dir, { recursive: true, force: true });
     }
   });

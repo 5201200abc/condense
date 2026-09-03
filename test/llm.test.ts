@@ -234,6 +234,78 @@ describe("summarizeBatch", () => {
     expect(maxActiveRequests).toBe(2);
   });
 
+  it("restarts the local server and retries one failed request", async () => {
+    const events: string[] = [];
+    let requests = 0;
+
+    const output = await summarizeBatch(
+      {
+        ...baseConfig,
+        provider: "local",
+        host: "http://127.0.0.1:8009/v1"
+      },
+      "1 passed",
+      {
+        ensureLocalServer: async () => {
+          events.push("ensure");
+        },
+        killLocalServer: async () => {
+          events.push("kill");
+          return true;
+        }
+      },
+      async () => {
+        requests += 1;
+
+        if (requests === 1) {
+          return new Response("oom", { status: 500 });
+        }
+
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "PASS" } }]
+          }),
+          { status: 200 }
+        );
+      }
+    );
+
+    expect(output).toBe("PASS");
+    expect(requests).toBe(2);
+    expect(events).toEqual(["ensure", "kill", "ensure"]);
+  });
+
+  it("caps local batch input while retaining the larger external budget", async () => {
+    const input = "x".repeat(12_000);
+    const bodies: Array<{
+      messages: Array<{ role: string; content: string }>;
+    }> = [];
+    const fetchImpl = async (_: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "PASS" } }]
+        }),
+        { status: 200 }
+      );
+    };
+
+    await summarizeBatch(
+      {
+        ...baseConfig,
+        provider: "local",
+        host: "http://127.0.0.1:8009/v1"
+      },
+      input,
+      { ensureLocalServer: async () => undefined },
+      fetchImpl
+    );
+    await summarizeBatch(baseConfig, input, fetchImpl);
+
+    expect(bodies[0].messages[1].content).toContain("chars truncated");
+    expect(bodies[1].messages[1].content).not.toContain("chars truncated");
+  });
+
   it("sends the batch prompt with config-derived params", async () => {
     let requestBody: unknown;
 

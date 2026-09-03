@@ -73,6 +73,29 @@ const PROGRESS_LABELS = {
   summarizing: "condense: summarizing"
 };
 
+function isSummarizeInvocation(argv) {
+  if (argv.length === 0) {
+    return false;
+  }
+
+  const head = argv[0];
+  return ![
+    "onboard",
+    "warmup",
+    "config",
+    "dsl",
+    "stats",
+    "savings",
+    "upgrade",
+    "update",
+    "translate",
+    "--help",
+    "-h",
+    "--version",
+    "-v"
+  ].includes(head);
+}
+
 const binPath = resolveBinaryPath();
 const progressWriter = process.stderr.isTTY ? process.stderr : process.stdout.isTTY ? process.stdout : null;
 let progressPhase = "collecting";
@@ -160,16 +183,22 @@ function flushChildStderr(force = false) {
   }
 }
 
-const child = spawn(binPath, process.argv.slice(2), {
+const childArgv = process.argv.slice(2);
+const child = spawn(binPath, childArgv, {
   stdio: ["inherit", "pipe", "pipe"],
   env: {
     ...process.env,
     CONDENSE_PACKAGE_ROOT: path.resolve(__dirname, ".."),
-    CONDENSE_PROGRESS_PROTOCOL: "stderr"
+    CONDENSE_PROGRESS_PROTOCOL: "stderr",
+    CONDENSE_STDIN_TTY: process.stdin.isTTY ? "1" : "0",
+    CONDENSE_STDOUT_TTY: process.stdout.isTTY ? "1" : "0",
+    CONDENSE_STDERR_TTY: process.stderr.isTTY ? "1" : "0"
   }
 });
 
-startProgress();
+if (isSummarizeInvocation(childArgv)) {
+  startProgress();
+}
 
 child.stdout.on("data", (chunk) => {
   stopProgress();

@@ -1,17 +1,19 @@
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, createWriteStream, openSync } from "node:fs";
-import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import type { LocalBackend, RuntimeConfig } from "./config";
+import { pidIsAlive, withFileLock } from "./file-lock";
 import { resolveConfigBaseDir } from "./user-config";
 
 export type ResolvedLocalBackend = "mlx" | "llamacpp";
+export type ProbeStatus = "ready" | "down" | "incompatible" | "zombie";
 
 export interface ProbeResult {
-  status: "ready" | "down" | "incompatible";
+  status: ProbeStatus;
 }
 
 interface EnsureLocalServerOptions {
@@ -20,6 +22,7 @@ interface EnsureLocalServerOptions {
   arch?: string;
   fetchImpl?: typeof fetch;
   probeServer?: (config: RuntimeConfig) => Promise<ProbeResult>;
+  killServer?: (env: NodeJS.ProcessEnv) => Promise<boolean>;
   installRuntime?: (
     backend: ResolvedLocalBackend,
     config: RuntimeConfig
@@ -39,6 +42,7 @@ const LLAMA_FILE = "distill2-0.6B-Q4_K_M.GGUF";
 const LLAMA_ALIAS = "condense-local";
 const STARTUP_TIMEOUT_MS = 90_000;
 const PROBE_INTERVAL_MS = 500;
+const CHAT_PROBE_TIMEOUT_MS = 10_000;
 
 export function resolveLocalBackend(
   backend: LocalBackend,
@@ -64,6 +68,10 @@ export function buildLocalServerArgs(
       config.localHost,
       "--port",
       String(config.localPort),
+      "--decode-concurrency",
+      String(config.localConcurrency),
+      "--prompt-concurrency",
+      String(config.localConcurrency),
       "--prompt-cache-size",
       "0",
       "--prompt-cache-bytes",
@@ -88,6 +96,37 @@ export function buildLocalServerArgs(
   ];
 }
 
+export async function killLocalServer(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<boolean> {
+  const pidPath = localServerPidPath(env);
+  try {
+    const raw = (await readFile(pidPath, "utf8")).trim();
+    const pid = Number(raw);
+
+    if (Number.isInteger(pid) && pid > 0 && pidIsAlive(pid)) {
+      try {
+        process.kill(pid, "SIGTERM");
+        const deadline = Date.now() + 500;
+        while (Date.now() < deadline && pidIsAlive(pid)) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        if (pidIsAlive(pid)) {
+          process.kill(pid, "SIGKILL");
+        }
+      } catch {
+        // process might have already exited
+      }
+    }
+
+    await rm(pidPath, { force: true });
+    return true;
+  } catch {
+    await rm(pidPath, { force: true }).catch(() => {});
+    return false;
+  }
+}
+
 export async function ensureLocalServer(
   config: RuntimeConfig,
   options: EnsureLocalServerOptions = {}
@@ -99,19 +138,21 @@ export async function ensureLocalServer(
   const env = options.env ?? process.env;
   const probeServer = options.probeServer ?? ((runtimeConfig) =>
     probeLocalServer(runtimeConfig, options.fetchImpl ?? fetch));
-  const firstProbe = await probeServer(config);
-
-  if (firstProbe.status === "ready") {
-    return;
-  }
-
-  if (firstProbe.status === "incompatible") {
-    throw new Error(
-      `Local condense server port ${config.localHost}:${config.localPort} is already in use by a non-compatible service. See ${localServerLogPath(env)}.`
-    );
-  }
+  const killServer = options.killServer ?? killLocalServer;
 
   const start = async () => {
+    const firstProbe = await probeServer(config);
+
+    if (firstProbe.status === "ready") {
+      return;
+    }
+
+    if (firstProbe.status === "incompatible") {
+      throw new Error(
+        `Local condense server port ${config.localHost}:${config.localPort} is already in use by a non-compatible service. See ${localServerLogPath(env)}.`
+      );
+    }
+
     const secondProbe = await probeServer(config);
 
     if (secondProbe.status === "ready") {
@@ -122,6 +163,10 @@ export async function ensureLocalServer(
       throw new Error(
         `Local condense server port ${config.localHost}:${config.localPort} is already in use by a non-compatible service. See ${localServerLogPath(env)}.`
       );
+    }
+
+    if (secondProbe.status === "zombie") {
+      await killServer(env);
     }
 
     const backend = resolveLocalBackend(
@@ -151,7 +196,12 @@ export async function ensureLocalServer(
     });
   };
 
-  if (options.probeServer || options.installRuntime || options.spawnServer) {
+  if (
+    options.probeServer ||
+    options.killServer ||
+    options.installRuntime ||
+    options.spawnServer
+  ) {
     await start();
     return;
   }
@@ -159,16 +209,16 @@ export async function ensureLocalServer(
   await withStartupLock(env, start);
 }
 
-async function probeLocalServer(
+export async function probeLocalServer(
   config: RuntimeConfig,
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch = fetch
 ): Promise<ProbeResult> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1_000);
+  const modelsController = new AbortController();
+  const modelsTimeout = setTimeout(() => modelsController.abort(), 1_000);
 
   try {
     const url = buildLocalModelsUrl(config.host);
-    const response = await fetchImpl(url, { signal: controller.signal });
+    const response = await fetchImpl(url, { signal: modelsController.signal });
 
     if (!response.ok) {
       return { status: "incompatible" };
@@ -176,14 +226,71 @@ async function probeLocalServer(
 
     const payload = (await response.json()) as { data?: unknown };
 
-    return Array.isArray(payload.data)
-      ? { status: "ready" }
-      : { status: "incompatible" };
-  } catch {
+    if (!Array.isArray(payload.data)) {
+      return { status: "incompatible" };
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return { status: "zombie" };
+    }
     return { status: "down" };
   } finally {
-    clearTimeout(timeout);
+    clearTimeout(modelsTimeout);
   }
+
+  // HTTP models list endpoint returned 200, now perform deep generation check to catch thread deadlocks/Metal OOM
+  const chatController = new AbortController();
+  const chatTimeout = setTimeout(
+    () => chatController.abort(),
+    CHAT_PROBE_TIMEOUT_MS
+  );
+
+  try {
+    const chatUrl = buildChatCompletionsUrl(config.host);
+    const response = await fetchImpl(chatUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+        temperature: 0
+      }),
+      signal: chatController.signal
+    });
+
+    if (!response.ok) {
+      return { status: "zombie" };
+    }
+
+    const payload = (await response.json()) as { choices?: unknown[] };
+
+    if (!Array.isArray(payload.choices) || payload.choices.length === 0) {
+      return { status: "zombie" };
+    }
+
+    return { status: "ready" };
+  } catch {
+    return { status: "zombie" };
+  } finally {
+    clearTimeout(chatTimeout);
+  }
+}
+
+function buildChatCompletionsUrl(baseUrl: string): URL {
+  const normalized = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+  const pathname = normalized.pathname.replace(/\/+$/, "");
+
+  normalized.pathname =
+    pathname === "" || pathname === "/"
+      ? "/v1/chat/completions"
+      : `${pathname}/chat/completions`;
+  normalized.search = "";
+  normalized.hash = "";
+
+  return normalized;
 }
 
 function buildLocalModelsUrl(baseUrl: string): URL {
@@ -238,31 +345,7 @@ async function withStartupLock(
   callback: () => Promise<void>
 ): Promise<void> {
   const lockPath = path.join(resolveConfigBaseDir(env), "local-server.lock");
-  await mkdir(path.dirname(lockPath), { recursive: true });
-  const deadline = Date.now() + 30_000;
-
-  while (true) {
-    try {
-      await writeFile(lockPath, String(process.pid), { flag: "wx" });
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
-        throw error;
-      }
-
-      if (Date.now() > deadline) {
-        throw new Error(`Timed out waiting for local condense server lock: ${lockPath}`);
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-  }
-
-  try {
-    await callback();
-  } finally {
-    await rm(lockPath, { force: true });
-  }
+  await withFileLock(lockPath, callback, { timeoutMs: 180_000, pollMs: 200 });
 }
 
 async function installRuntime(
@@ -522,16 +605,17 @@ async function spawnLocalServer(
   }
 
   child.unref();
-  await writeFile(
-    path.join(path.dirname(logPath), "local-server.pid"),
-    `${child.pid ?? ""}\n`
-  );
+  await writeFile(localServerPidPath(env), `${child.pid ?? ""}\n`);
 
   if (!child.pid) {
     throw new Error(
       `Failed to start local condense server at ${config.localHost}:${config.localPort}. See ${logPath}.`
     );
   }
+}
+
+export function localServerPidPath(env: NodeJS.ProcessEnv): string {
+  return path.join(resolveConfigBaseDir(env), "logs", "local-server.pid");
 }
 
 function localServerLogPath(env: NodeJS.ProcessEnv): string {

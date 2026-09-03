@@ -19,45 +19,24 @@
 
 ## Installation
 
-### Quick Install (macOS / Linux)
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
 ```
 
-### Package Managers
+Installs the CLI and the local 0.6B model. Skip the model with `CONDENSE_SKIP_WARMUP=1`. Upgrade by running the same command. `condense update` prints the latest version.
+
+npm / bun (then load the model):
 
 ```bash
 npm install -g condense
 # or
 bun add -g condense
+condense warmup
 ```
 
-## Upgrade
+## Agent setup
 
-To upgrade `condense` to the latest version:
-
-### Quick Install (Script)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
-```
-
-### Package Managers
-
-```bash
-npm install -g condense@latest
-# or
-bun add -g condense@latest
-```
-
-### CLI Check
-
-```bash
-condense update
-```
-
-Add the following minimal directive to `~/.claude/CLAUDE.md`:
+`~/.claude/CLAUDE.md`:
 ```text
 <!-- condense -->
 Pipe high-volume commands (>100 lines: test runners, compiler logs, plans) through condense:
@@ -65,7 +44,7 @@ Pipe high-volume commands (>100 lines: test runners, compiler logs, plans) throu
 Skip for interactive/TUI or short outputs.
 ```
 
-Add the following directive to `~/.codex/AGENTS.md`:
+`~/.codex/AGENTS.md`:
 ```text
 <!-- condense -->
 Pipe high-volume commands (>100 lines: test suites, build/tsc logs, terraform) through condense:
@@ -73,39 +52,20 @@ Pipe high-volume commands (>100 lines: test suites, build/tsc logs, terraform) t
 Never use condense for small commands (cat, sed, pwd, ls, file reads).
 ```
 
-### Pipeline Usage
+## Usage
+
 ```bash
-# Test runner output
 bun test 2>&1 | condense "Did tests pass? Return PASS or FAIL, with failing test files."
-
-# Compiler diagnostics
 npx tsc --noEmit 2>&1 | condense "Did build succeed? List exact error files and line numbers."
-
-# Git diff summary
 git diff 2>&1 | condense "What changed? Return only modified files and summary."
 ```
 
-### Character Savings and Metrics
-
-Track how many characters and lines `condense` has saved across your workflow:
-
 ```bash
-# View global summary of saved characters, lines, and compression ratio
 condense stats
-
-# View summary with detailed history of recent compression commands
 condense stats -H
-
-# Filter metrics for the current project
 condense stats --project
-
-# Output metrics in JSON format
 condense stats --json
-
-# Filter metrics for the last N days
 condense stats --days 7
-
-# Print per-execution character savings to stderr alongside pipeline output
 bun test 2>&1 | condense --stats "Did tests pass?"
 ```
 

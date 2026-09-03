@@ -2,6 +2,8 @@
   "name": "condense-linux-arm64",
   "version": "1.5.2",
   "license": "Apache-2.0",
+  "os": ["linux"],
+  "cpu": ["arm64"],
   "files": [
     "bin/condense"
   ],

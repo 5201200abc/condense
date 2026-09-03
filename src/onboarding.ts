@@ -3,6 +3,8 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import { stdin as defaultInput, stdout as defaultOutput } from "node:process";
 
+import embeddedCondenseSkill from "../skills/condense/SKILL.md" with { type: "text" };
+
 import {
   DEFAULT_HOST,
   DEFAULT_LOCAL_BACKEND,
@@ -21,7 +23,8 @@ import type { PersistedConfig } from "./config";
 import { seedGlobalDslMemory } from "./dsl-memory";
 import { chatCompletion } from "./llm";
 import { ensureLocalServer } from "./local-server";
-import { writePersistedConfig } from "./user-config";
+import { stdinIsTTY, stdoutIsTTY } from "./tty";
+import { resolveConfigBaseDir, writePersistedConfig } from "./user-config";
 
 const AGENT_INSTRUCTIONS = [
   "<!-- condense skill: begin -->",
@@ -95,7 +98,7 @@ function resolveHome(env: NodeJS.ProcessEnv): string {
 }
 
 function resolvePackageRoot(env: NodeJS.ProcessEnv): string {
-  const root = (env.CONDENSE_PACKAGE_ROOT ?? env.DISTILL_PACKAGE_ROOT)?.trim();
+  const root = env.CONDENSE_PACKAGE_ROOT?.trim();
   if (root) {
     return root;
   }
@@ -212,18 +215,16 @@ function shouldUseTui(
   output: NodeJS.WritableStream,
   env: NodeJS.ProcessEnv
 ): boolean {
-  if ((env.CONDENSE_ONBOARDING_TUI ?? env.DISTILL_ONBOARDING_TUI) === "false") {
+  if (env.CONDENSE_ONBOARDING_TUI === "false") {
     return false;
   }
 
-  return Boolean(
-    (input as NodeJS.ReadStream).isTTY &&
-      (output as NodeJS.WriteStream).isTTY
-  );
+  return stdinIsTTY(env, input as NodeJS.ReadStream) &&
+    stdoutIsTTY(env, output as NodeJS.WriteStream);
 }
 
 function shouldPreloadLocalModel(env: NodeJS.ProcessEnv): boolean {
-  return (env.CONDENSE_ONBOARDING_PRELOAD ?? env.DISTILL_ONBOARDING_PRELOAD) !== "false";
+  return env.CONDENSE_ONBOARDING_PRELOAD !== "false";
 }
 
 function resolveHuggingFaceCacheDir(env: NodeJS.ProcessEnv): string | null {
@@ -387,6 +388,30 @@ async function defaultPrepareLocalModel(
   }
 }
 
+async function runLocalModelWarmup(
+  env: NodeJS.ProcessEnv,
+  config: PersistedConfig,
+  output: Pick<NodeJS.WritableStream, "write">,
+  prepareLocalModel: PrepareLocalModel
+): Promise<void> {
+  let lastPercent = -1;
+  const writeProgress = (percent: number) => {
+    if (percent === lastPercent) {
+      return;
+    }
+
+    lastPercent = percent;
+    output.write(`(${percent}%) Downloading and loading Condense local model...\n`);
+  };
+
+  writeProgress(0);
+  await prepareLocalModel({
+    question: "Warm up Condense local model.",
+    ...resolveRuntimeDefaults(env, config)
+  }, writeProgress);
+  output.write("Local Condense model ready\n");
+}
+
 async function prepareLocalModelIfNeeded(
   env: NodeJS.ProcessEnv,
   config: PersistedConfig,
@@ -397,22 +422,37 @@ async function prepareLocalModelIfNeeded(
     return;
   }
 
-  let lastPercent = -1;
-  const writeProgress = (percent: number) => {
-    if (percent === lastPercent) {
-      return;
-    }
+  await runLocalModelWarmup(env, config, output, prepareLocalModel);
+}
 
-    lastPercent = percent;
-    output.write(`(${percent}%) Downloading and loading Distill local model...\n`);
-  };
+export async function warmupLocalModel({
+  env,
+  persisted = {},
+  output = defaultOutput,
+  prepareLocalModel
+}: {
+  env: NodeJS.ProcessEnv;
+  persisted?: PersistedConfig;
+  output?: Pick<NodeJS.WritableStream, "write">;
+  prepareLocalModel?: PrepareLocalModel;
+}): Promise<void> {
+  const provider = persisted.provider ?? DEFAULT_PROVIDER;
 
-  writeProgress(0);
-  await prepareLocalModel({
-    question: "Warm up Distill local model.",
-    ...resolveRuntimeDefaults(env, config)
-  }, writeProgress);
-  output.write("Local Distill model ready\n");
+  if (provider !== "local") {
+    output.write("condense warmup skipped: provider is not local.\n");
+    return;
+  }
+
+  const prepare =
+    prepareLocalModel ??
+    ((config, onProgress) => defaultPrepareLocalModel(env, config, onProgress));
+
+  await runLocalModelWarmup(
+    env,
+    { ...persisted, provider: "local" },
+    output,
+    prepare
+  );
 }
 
 function requirePromptValue<T>(value: T | symbol): T {
@@ -449,10 +489,41 @@ async function upsertInstructions(filePath: string): Promise<void> {
   await writeFile(filePath, `${prefix}${AGENT_INSTRUCTIONS}\n`);
 }
 
+async function directoryExists(target: string): Promise<boolean> {
+  try {
+    return (await stat(target)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function resolveSkillSource(env: NodeJS.ProcessEnv): Promise<string> {
+  const packageRoot = resolvePackageRoot(env);
+  const candidates = [
+    path.join(packageRoot, "skills", "condense"),
+    path.join(import.meta.dir, "..", "skills", "condense"),
+    path.join(import.meta.dir, "skills", "condense"),
+    path.join(path.dirname(process.execPath), "skills", "condense"),
+    path.join(resolveConfigBaseDir(env), "skills", "condense")
+  ];
+
+  for (const candidate of candidates) {
+    if (await directoryExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  const fallback = path.join(resolveConfigBaseDir(env), "skills", "condense");
+  await mkdir(fallback, { recursive: true, mode: 0o700 });
+  await writeFile(path.join(fallback, "SKILL.md"), embeddedCondenseSkill, {
+    mode: 0o600
+  });
+  return fallback;
+}
+
 async function installSkill(env: NodeJS.ProcessEnv): Promise<void> {
   const home = resolveHome(env);
-  const packageRoot = resolvePackageRoot(env);
-  const skillSource = path.join(packageRoot, "skills", "condense");
+  const skillSource = await resolveSkillSource(env);
   const codexTarget = path.join(home, ".codex", "skills", "condense");
   const claudeTarget = path.join(home, ".claude", "skills", "condense");
 
@@ -492,7 +563,7 @@ async function runTuiOnboarding(
         options: [
           {
             value: "local",
-            label: "Distill local model",
+            label: "Condense local model",
             hint: "default; runs on this machine"
           },
           {
@@ -635,17 +706,17 @@ async function runTuiOnboarding(
     if (config.provider === "local" && shouldPreloadLocalModel(env)) {
       const spinner = prompts.spinner({ indicator: "dots" });
       const formatProgress = (percent: number) =>
-        `(${percent}%) Downloading and loading Distill local model...`;
+        `(${percent}%) Downloading and loading Condense local model...`;
       spinner.start(formatProgress(0));
 
       try {
         await prepareLocalModel({
-          question: "Warm up Distill local model.",
+          question: "Warm up Condense local model.",
           ...resolveRuntimeDefaults(env, config)
         }, (percent) => spinner.message(formatProgress(percent)));
-        spinner.stop("Local Distill model ready");
+        spinner.stop("Local Condense model ready");
       } catch (error) {
-        spinner.stop("Local Distill model failed to start", 1);
+        spinner.stop("Local Condense model failed to start", 1);
         throw error;
       }
     }

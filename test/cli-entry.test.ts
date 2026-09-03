@@ -27,6 +27,19 @@ describe("cli entrypoint", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('cmd 2>&1 | condense "question"');
+    expect(result.stdout).toContain("condense onboard");
+    expect(result.stdout).toContain("condense warmup");
+  });
+
+  it("rejects piped stdin without a question instead of onboarding", () => {
+    const result = spawnSync("bun", ["run", cli], {
+      cwd: root,
+      encoding: "utf8",
+      input: "PASS test/auth.test.ts\n"
+    });
+
+    expect(result.status).toBe(2);
+    expect(`${result.stdout}${result.stderr}`).toContain("A question is required.");
   });
 
   it("prints the version", () => {
@@ -202,7 +215,7 @@ describe("cli entrypoint", () => {
       await writeFile(path.join(home, ".codex", "AGENTS.md"), oldBlock);
       await writeFile(path.join(home, ".claude", "CLAUDE.md"), oldBlock);
 
-      const result = spawnSync("bun", ["run", cli], {
+      const result = spawnSync("bun", ["run", cli, "onboard"], {
         cwd: root,
         encoding: "utf8",
         input: [
@@ -306,7 +319,7 @@ describe("cli entrypoint", () => {
     const configPath = path.join(dir, "config.json");
 
     try {
-      const result = spawnSync("bun", ["run", cli], {
+      const result = spawnSync("bun", ["run", cli, "onboard"], {
         cwd: root,
         encoding: "utf8",
         input: [

@@ -21,7 +21,12 @@ export function hasPromptLikeTail(input: string): boolean {
 }
 
 export function hasRedrawSignal(input: string): boolean {
-  return input.includes("\r") || input.includes("\u001b[2J") || input.includes("\u001bc");
+  const withoutCrlf = input.replace(/\r\n/g, "\n");
+  return (
+    withoutCrlf.includes("\r") ||
+    input.includes("\u001b[2J") ||
+    input.includes("\u001bc")
+  );
 }
 
 function structuralSignature(input: string): string[] {
@@ -82,7 +87,7 @@ export function looksLikeBadDistillation(
   }
 
   if (normalizedSource.length >= 1024) {
-    return normalizedCandidate.length >= normalizedSource.length * 0.8;
+    return normalizedCandidate.length >= normalizedSource.length * 0.95;
   }
 
   if (normalizedSource.length > 0) {

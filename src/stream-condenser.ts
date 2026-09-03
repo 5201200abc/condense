@@ -62,8 +62,6 @@ export interface CondenseSessionOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-export type DistillSessionOptions = CondenseSessionOptions;
-
 export class CondenseSession {
   private readonly env: NodeJS.ProcessEnv;
   private readonly summarizer: Summarizer;
@@ -80,7 +78,6 @@ export class CondenseSession {
   private readonly idleMs: number;
   private readonly interactiveGapMs: number;
   private readonly progressFrameMs: number;
-  private readonly startTime: number;
   private readonly rawBuffers: Buffer[] = [];
   private readonly completedBursts: Burst[] = [];
   private currentBurstBuffers: Buffer[] = [];
@@ -99,7 +96,7 @@ export class CondenseSession {
   private progressFrameIndex = 0;
   private lastProgressRenderAt = 0;
 
-  constructor(options: DistillSessionOptions) {
+  constructor(options: CondenseSessionOptions) {
     this.env = options.env ?? process.env;
     this.summarizer = options.summarizer;
     this.runtimeConfig = options.runtimeConfig ?? null;
@@ -115,7 +112,6 @@ export class CondenseSession {
     this.idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
     this.interactiveGapMs = options.interactiveGapMs ?? DEFAULT_INTERACTIVE_GAP_MS;
     this.progressFrameMs = options.progressFrameMs ?? DEFAULT_PROGRESS_FRAME_MS;
-    this.startTime = Date.now();
     this.onProgressPhase?.(this.progressPhase);
     this.startProgress();
   }
@@ -169,9 +165,11 @@ export class CondenseSession {
 
     try {
       this.setProgressPhase("summarizing");
+      const summarizeStartedAt = Date.now();
       const summary = await this.summarizer.summarizeBatch(normalizedInput);
+      const durationMs = Date.now() - summarizeStartedAt;
 
-      if (looksLikeBadDistillation(rawInput, summary)) {
+      if (looksLikeBadDistillation(normalizedInput, summary)) {
         this.stopProgress(true);
         this.stdout.write(Buffer.concat(this.rawBuffers));
         return;
@@ -182,7 +180,7 @@ export class CondenseSession {
       this.stdout.write(ensureTrailingNewline(output));
       await this.captureDatasetRecord(normalizedInput, output);
       await this.captureDslLearning(output);
-      await this.captureStatsRecord(rawInput, output, Date.now() - this.startTime);
+      await this.captureStatsRecord(rawInput, output, durationMs);
     } catch {
       this.stopProgress(true);
       this.stdout.write(Buffer.concat(this.rawBuffers));
@@ -264,13 +262,16 @@ export class CondenseSession {
 
       if (this.mode === "undecided" && this.shouldPromoteToWatch()) {
         this.promoteToWatch();
+      }
+
+      if (this.mode === "watch") {
         this.scheduleLatestWatchRender();
       }
     }, this.idleMs);
   }
 
   private restartInteractiveTimer(): void {
-    if (this.mode !== "undecided") {
+    if (this.passthrough || this.mode === "interactive") {
       return;
     }
 
@@ -285,7 +286,7 @@ export class CondenseSession {
     }
 
     this.interactiveTimer = setTimeout(() => {
-      if (this.mode !== "undecided") {
+      if (this.passthrough || this.mode === "interactive") {
         return;
       }
 
@@ -293,12 +294,41 @@ export class CondenseSession {
         return;
       }
 
-      this.mode = "interactive";
-      this.passthrough = true;
-      this.clearTimers();
-      this.stopProgress(true);
-      this.stdout.write(Buffer.concat(this.rawBuffers));
+      this.enterInteractivePassthrough();
     }, this.interactiveGapMs);
+  }
+
+  private enterInteractivePassthrough(): void {
+    const dump = this.collectPassthroughDump();
+    this.mode = "interactive";
+    this.passthrough = true;
+    this.clearTimers();
+    this.stopProgress(true);
+
+    if (dump.length > 0) {
+      this.stdout.write(dump);
+    }
+  }
+
+  private collectPassthroughDump(): Buffer {
+    if (this.mode === "watch") {
+      const parts: Buffer[] = [];
+      const last = this.completedBursts[this.completedBursts.length - 1];
+
+      if (last) {
+        parts.push(Buffer.from(last.raw));
+      }
+
+      if (this.currentBurstBuffers.length > 0) {
+        parts.push(Buffer.concat(this.currentBurstBuffers));
+      }
+
+      return parts.length > 0 ? Buffer.concat(parts) : Buffer.alloc(0);
+    }
+
+    return this.rawBuffers.length > 0
+      ? Buffer.concat(this.rawBuffers)
+      : Buffer.alloc(0);
   }
 
   private clearTimers(): void {
@@ -445,7 +475,7 @@ export class CondenseSession {
           current.normalized
         );
 
-        if (looksLikeBadDistillation(current.raw, summary)) {
+        if (looksLikeBadDistillation(current.normalized, summary)) {
           this.renderWatchFallback(current.raw);
           return;
         }
@@ -483,11 +513,17 @@ export class CondenseSession {
   }
 
   private getTail(): string {
+    const sourceBuffers =
+      this.currentBurstBuffers.length > 0
+        ? this.currentBurstBuffers
+        : this.mode === "watch" && this.completedBursts.length > 0
+          ? [Buffer.from(this.completedBursts[this.completedBursts.length - 1].raw)]
+          : this.rawBuffers;
     const tailBuffers: Buffer[] = [];
     let remaining = 256;
 
-    for (let index = this.rawBuffers.length - 1; index >= 0 && remaining > 0; index -= 1) {
-      const chunk = this.rawBuffers[index];
+    for (let index = sourceBuffers.length - 1; index >= 0 && remaining > 0; index -= 1) {
+      const chunk = sourceBuffers[index];
 
       if (chunk.length <= remaining) {
         tailBuffers.unshift(chunk);
@@ -511,4 +547,3 @@ export class CondenseSession {
   }
 }
 
-export const DistillSession = CondenseSession;

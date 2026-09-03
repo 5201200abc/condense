@@ -36,6 +36,11 @@ const expectedLocalHost = `http://${DEFAULT_LOCAL_HOST}:${DEFAULT_LOCAL_PORT}/v1
 describe("parseCommand", () => {
   it("parses no arguments as onboarding", () => {
     expect(parseCommand([], {}, {})).toEqual({ kind: "onboard" });
+    expect(parseCommand(["onboard"], {}, {})).toEqual({ kind: "onboard" });
+  });
+
+  it("requires a question when stdin is not a TTY", () => {
+    expect(() => parseCommand([], {}, {}, { stdinIsTTY: false })).toThrow(UsageError);
   });
 
   it("parses dsl commands", () => {
@@ -59,6 +64,10 @@ describe("parseCommand", () => {
   it("parses update and upgrade commands", () => {
     expect(parseCommand(["update"], {}, {})).toEqual({ kind: "upgrade" });
     expect(parseCommand(["upgrade"], {}, {})).toEqual({ kind: "upgrade" });
+  });
+
+  it("parses warmup command", () => {
+    expect(parseCommand(["warmup"], {}, {})).toEqual({ kind: "warmup" });
   });
 
   it("parses defaults and joins the question", () => {
@@ -387,6 +396,19 @@ describe("parseCommand", () => {
     expect(() => parseCommand(["config", "local-backend", "ollama"], {}, {})).toThrow(
       UsageError
     );
+  });
+
+  it("brackets IPv6 local hosts in the API base URL", () => {
+    expect(
+      resolveRuntimeDefaults(
+        {
+          CONDENSE_PROVIDER: "local",
+          CONDENSE_LOCAL_HOST: "::1",
+          CONDENSE_LOCAL_PORT: "8009"
+        },
+        {}
+      ).host
+    ).toBe("http://[::1]:8009/v1");
   });
 
   it("normalizes trailing slash on host", () => {

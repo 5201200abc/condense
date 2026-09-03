@@ -72,6 +72,42 @@ describe("CondenseSession", () => {
     expect(writer.read()).toContain("All tests passed\n");
   });
 
+  it("records summarize duration excluding stdin wait", async () => {
+    let recordedMs: number | undefined;
+    const writer = createWriter();
+    const session = new CondenseSession({
+      stdout: writer,
+      isTTY: false,
+      idleMs: 10,
+      interactiveGapMs: 5,
+      runtimeConfig: {
+        question: "Did tests pass?",
+        provider: "local",
+        localBackend: "auto",
+        localConcurrency: 5,
+        localHost: "127.0.0.1",
+        localPort: 8009,
+        model: "condense-local",
+        host: "http://127.0.0.1:8009/v1",
+        apiKey: "",
+        timeoutMs: 1000,
+        datasetEnabled: false
+      },
+      summarizer: createDelayedSummarizer(40, "PASS"),
+      onBatchStat: (stat) => {
+        recordedMs = stat.durationMs;
+      }
+    });
+
+    await sleep(120);
+    session.push(Buffer.from("PASS test/a.test.ts\nFAIL test/b.test.ts\n"));
+    await session.end();
+
+    expect(recordedMs).toBeDefined();
+    expect(recordedMs ?? 0).toBeGreaterThanOrEqual(30);
+    expect(recordedMs ?? 0).toBeLessThan(110);
+  });
+
   it("writes a dataset record for successful batch output", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "condense-session-dataset-"));
     const datasetPath = path.join(dir, "condense.jsonl");
@@ -595,5 +631,63 @@ describe("CondenseSession", () => {
     expect(writer.read()).toBe("Continue? [y/N]\nyes\n");
     expect(progress.read()).toContain("condense: waiting");
     expect(progress.read().endsWith("\r\u001b[2K")).toBe(true);
+  });
+
+  it("does not promote CRLF bursts to watch mode", async () => {
+    const writer = createWriter();
+    let watchCalls = 0;
+    const session = new CondenseSession({
+      stdout: writer,
+      isTTY: false,
+      idleMs: 15,
+      interactiveGapMs: 5,
+      summarizer: {
+        summarizeBatch: async () => "batch",
+        summarizeWatch: async () => {
+          watchCalls += 1;
+          return "watch";
+        }
+      }
+    });
+
+    session.push(Buffer.from("phase one unique alpha\r\n"));
+    await sleep(25);
+    session.push(Buffer.from("totally different omega\r\n"));
+    await sleep(25);
+    await session.end();
+
+    expect(watchCalls).toBe(0);
+    expect(writer.read()).toContain("batch");
+  });
+
+  it("switches from watch mode to interactive when a prompt appears", async () => {
+    const writer = createWriter();
+    let watchCalls = 0;
+    const session = new CondenseSession({
+      stdout: writer,
+      isTTY: false,
+      idleMs: 15,
+      interactiveGapMs: 10,
+      summarizer: {
+        summarizeBatch: async () => "unused",
+        summarizeWatch: async () => {
+          watchCalls += 1;
+          return "failure count changed";
+        }
+      }
+    });
+
+    session.push(Buffer.from("watch run\nfailed: 0\n"));
+    await sleep(25);
+    session.push(Buffer.from("watch run\nfailed: 1\n"));
+    await sleep(25);
+    session.push(Buffer.from("Continue? [y/N]"));
+    await sleep(25);
+    session.push(Buffer.from("\nyes\n"));
+    await session.end();
+
+    expect(watchCalls).toBeGreaterThan(0);
+    expect(writer.read()).toContain("Continue? [y/N]");
+    expect(writer.read()).toContain("yes");
   });
 });

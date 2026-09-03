@@ -5,6 +5,7 @@ export interface PromptMessages {
 
 export interface BatchPromptOptions {
   dslMemory?: string;
+  maxInputChars?: number;
 }
 
 export interface ThreadLearnPromptCandidate {
@@ -127,6 +128,7 @@ const REFERENCE_EXAMPLES = [
 ].join("\n");
 
 const MAX_INPUT_CHARS = 24000;
+export const LOCAL_MAX_INPUT_CHARS = 8000;
 
 export function fitInput(input: string, maxChars: number = MAX_INPUT_CHARS): string {
   if (input.length <= maxChars) {
@@ -176,7 +178,7 @@ export function buildBatchPrompt(
     system: [CONDENSE_CORE_DIRECTIVES, inlineVariableRules, dslRules, REFERENCE_EXAMPLES]
       .filter(Boolean)
       .join("\n\n"),
-    user: `Command output:\n${fitInput(input)}\n\nQuestion: ${question}`
+    user: `Command output:\n${fitInput(input, options.maxInputChars)}\n\nQuestion: ${question}`
   };
 }
 
@@ -263,7 +265,8 @@ export function buildThreadLearnPrompt(
 export function buildWatchPrompt(
   question: string,
   previousCycle: string,
-  currentCycle: string
+  currentCycle: string,
+  maxCycleChars: number = MAX_INPUT_CHARS
 ): PromptMessages {
   const watchRules = [
     "You compare two consecutive watch-mode cycles for another model that will act on your answer.",
@@ -277,10 +280,10 @@ export function buildWatchPrompt(
     system: `${watchRules}\n\n${CONDENSE_CORE_DIRECTIVES}\n\n${REFERENCE_EXAMPLES}`,
     user: [
       "Previous cycle:",
-      fitInput(previousCycle),
+      fitInput(previousCycle, maxCycleChars),
       "",
       "Current cycle:",
-      fitInput(currentCycle),
+      fitInput(currentCycle, maxCycleChars),
       "",
       `Question: ${question}`
     ].join("\n")
