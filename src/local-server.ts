@@ -1,11 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
-import { closeSync, createWriteStream, openSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { closeSync, createWriteStream, existsSync, openSync } from "node:fs";
+import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import type { LocalBackend, RuntimeConfig } from "./config";
+import { CONDENSE_LLAMA_GGUF_FILENAME } from "./config";
 import { pidIsAlive, withFileLock } from "./file-lock";
 import { resolveConfigBaseDir } from "./user-config";
 
@@ -37,28 +38,93 @@ interface EnsureLocalServerOptions {
 }
 
 const MLX_MODEL = "samuelfaj/distill2-0.6B-4bit-MLX";
-const LLAMA_REPO = "samuelfaj/distill2-0.6B-4bit-GGUF:Q4_K_M";
-const LLAMA_FILE = "distill2-0.6B-Q4_K_M.GGUF";
 const LLAMA_ALIAS = "condense-local";
+const LLAMA_CTX_PER_SLOT = 4096;
 const STARTUP_TIMEOUT_MS = 90_000;
 const PROBE_INTERVAL_MS = 500;
 const CHAT_PROBE_TIMEOUT_MS = 10_000;
 
 export function resolveLocalBackend(
   backend: LocalBackend,
-  platform = process.platform,
-  arch = process.arch
+  _platform = process.platform,
+  _arch = process.arch
 ): ResolvedLocalBackend {
   if (backend !== "auto") {
     return backend;
   }
 
-  return platform === "darwin" && arch === "arm64" ? "mlx" : "llamacpp";
+  return "llamacpp";
+}
+
+export function llamaGgufCandidates(
+  env: NodeJS.ProcessEnv = process.env
+): string[] {
+  const explicit = env.CONDENSE_LLAMA_GGUF?.trim();
+  const packageRoot =
+    env.CONDENSE_PACKAGE_ROOT?.trim() || path.resolve(import.meta.dir, "..");
+  const configDir = resolveConfigBaseDir(env);
+
+  return [
+    explicit,
+    path.join(packageRoot, "training/gguf/v2", CONDENSE_LLAMA_GGUF_FILENAME),
+    path.join(configDir, "models", CONDENSE_LLAMA_GGUF_FILENAME)
+  ].filter((candidate): candidate is string => Boolean(candidate));
+}
+
+export function resolveLlamaGgufPath(
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  const explicit = env.CONDENSE_LLAMA_GGUF?.trim();
+
+  if (explicit) {
+    return path.resolve(explicit);
+  }
+
+  for (const candidate of llamaGgufCandidates(env)) {
+    if (existsSync(candidate)) {
+      return path.resolve(candidate);
+    }
+  }
+
+  return path.resolve(
+    llamaGgufCandidates(env)[0] ?? CONDENSE_LLAMA_GGUF_FILENAME
+  );
+}
+
+export async function stagePackagedGguf(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<string | null> {
+  if (env.CONDENSE_LLAMA_GGUF?.trim()) {
+    return path.resolve(env.CONDENSE_LLAMA_GGUF.trim());
+  }
+
+  const dest = path.join(
+    resolveConfigBaseDir(env),
+    "models",
+    CONDENSE_LLAMA_GGUF_FILENAME
+  );
+
+  if (existsSync(dest)) {
+    return dest;
+  }
+
+  const packageRoot =
+    env.CONDENSE_PACKAGE_ROOT?.trim() || path.resolve(import.meta.dir, "..");
+  const src = path.join(packageRoot, "training/gguf/v2", CONDENSE_LLAMA_GGUF_FILENAME);
+
+  if (!existsSync(src) || path.resolve(src) === path.resolve(dest)) {
+    return existsSync(src) ? path.resolve(src) : null;
+  }
+
+  await mkdir(path.dirname(dest), { recursive: true });
+  await copyFile(src, dest);
+  return dest;
 }
 
 export function buildLocalServerArgs(
   backend: ResolvedLocalBackend,
-  config: RuntimeConfig
+  config: RuntimeConfig,
+  llamaGgufPath?: string
 ): string[] {
   if (backend === "mlx") {
     return [
@@ -75,15 +141,15 @@ export function buildLocalServerArgs(
       "--prompt-cache-size",
       "0",
       "--prompt-cache-bytes",
-      "0"
+      "0",
+      "--chat-template-args",
+      '{"enable_thinking":false}'
     ];
   }
 
   return [
-    "--hf-repo",
-    LLAMA_REPO,
-    "--hf-file",
-    LLAMA_FILE,
+    "--model",
+    llamaGgufPath ?? resolveLlamaGgufPath(),
     "--host",
     config.localHost,
     "--port",
@@ -92,7 +158,14 @@ export function buildLocalServerArgs(
     String(config.localConcurrency),
     "--cont-batching",
     "--alias",
-    LLAMA_ALIAS
+    LLAMA_ALIAS,
+    "--jinja",
+    "--ctx-size",
+    String(LLAMA_CTX_PER_SLOT * Math.max(1, config.localConcurrency)),
+    "--chat-template-kwargs",
+    '{"enable_thinking":false}',
+    "--reasoning",
+    "off"
   ];
 }
 
@@ -182,7 +255,20 @@ export async function ensureLocalServer(
       backend,
       config
     );
-    const args = buildLocalServerArgs(backend, config);
+    let llamaGgufPath: string | undefined;
+
+    if (backend === "llamacpp") {
+      await stagePackagedGguf(env);
+      llamaGgufPath = resolveLlamaGgufPath(env);
+
+      if (!existsSync(llamaGgufPath)) {
+        throw new Error(
+          `Missing local GGUF at ${llamaGgufPath}. Place ${CONDENSE_LLAMA_GGUF_FILENAME} at training/gguf/v2 or ~/.config/condense/models, or set CONDENSE_LLAMA_GGUF.`
+        );
+      }
+    }
+
+    const args = buildLocalServerArgs(backend, config, llamaGgufPath);
 
     const spawnServerFn =
       options.spawnServer ??
@@ -256,7 +342,8 @@ export async function probeLocalServer(
         model: config.model,
         messages: [{ role: "user", content: "ping" }],
         max_tokens: 1,
-        temperature: 0
+        temperature: 0,
+        chat_template_kwargs: { enable_thinking: false }
       }),
       signal: chatController.signal
     });
@@ -326,12 +413,6 @@ async function waitForServer(
 
     if (probe.status === "ready") {
       return;
-    }
-
-    if (probe.status === "incompatible") {
-      throw new Error(
-        `Local condense server port ${config.localHost}:${config.localPort} became incompatible during startup. See ${localServerLogPath(options.env ?? process.env)}.`
-      );
     }
   }
 

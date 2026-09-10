@@ -18,6 +18,7 @@ export interface ChatCompletionRequest {
   timeoutMs: number;
   maxTokens?: number;
   temperature?: number;
+  cachePrompt?: boolean;
   fetchImpl?: typeof fetch;
 }
 
@@ -109,6 +110,7 @@ export async function chatCompletion({
   timeoutMs,
   maxTokens,
   temperature,
+  cachePrompt,
   fetchImpl = fetch
 }: ChatCompletionRequest): Promise<string> {
   const controller = new AbortController();
@@ -133,7 +135,13 @@ export async function chatCompletion({
         model,
         messages,
         temperature: temperature ?? 0,
-        ...(maxTokens ? { max_tokens: maxTokens } : {})
+        ...(maxTokens ? { max_tokens: maxTokens } : {}),
+        ...(cachePrompt
+          ? {
+              cache_prompt: true,
+              chat_template_kwargs: { enable_thinking: false }
+            }
+          : {})
       }),
       signal: controller.signal
     });
@@ -195,6 +203,7 @@ async function summarize(
       timeoutMs: config.timeoutMs,
       temperature: 0,
       maxTokens: 512,
+      cachePrompt: config.provider === "local",
       fetchImpl
     });
 

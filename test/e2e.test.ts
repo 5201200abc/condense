@@ -354,9 +354,11 @@ describe("condense end-to-end", () => {
       expect(index).toBe(0);
       const prompt = JSON.stringify(body);
 
+      expect(prompt).toContain("Known /condense DSL memory");
       expect(prompt).toContain("#c1 = cache");
       expect(prompt).toContain("#m1 = model");
-      expect(prompt).toContain("<term>=#<letter><digit>");
+      expect(prompt).not.toContain("<term>=#<letter><digit>");
+      expect(prompt).not.toContain("Examples:");
       expect(prompt).not.toContain("workspace=#w3");
 
       return new Response(

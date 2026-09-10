@@ -152,7 +152,7 @@ describe("summarizeBatch", () => {
       {
         ...baseConfig,
         provider: "local",
-        model: "samuelfaj/distill2-0.6B-4bit-MLX",
+        model: "condense-local",
         host: "http://127.0.0.1:8009/v1"
       },
       "1 passed",
@@ -340,7 +340,7 @@ describe("summarizeBatch", () => {
     expect(body.messages[1].content).toContain(baseConfig.question);
   });
 
-  it("always tells the model to create efficient inline variables", async () => {
+  it("uses the compact training system prompt without runtime few-shot", async () => {
     let requestBody: unknown;
 
     const output = await summarizeBatch(
@@ -363,18 +363,10 @@ describe("summarizeBatch", () => {
     };
 
     expect(output).toContain("#c1");
-    expect(body.messages[0].content).toContain("Inline variable rule");
-    expect(body.messages[0].content).toContain("Before every visible response");
-    expect(body.messages[0].content).toContain("visible transcript plus the draft response");
-    expect(body.messages[0].content).toContain("appears 2+ times");
-    expect(body.messages[0].content).toContain("<term>=#<letter><digit>");
-    expect(body.messages[0].content).toContain("project nouns");
-    expect(body.messages[0].content).toContain("Visible transcript is the canonical Dict state");
-    expect(body.messages[0].content).toContain("Dict delta rule");
-    expect(body.messages[0].content).toContain("only with newly introduced variables");
-    expect(body.messages[0].content).toContain("omit Dict instead of restating old definitions");
-    expect(body.messages[0].content).toContain("Substitution pass");
-    expect(body.messages[0].content).toContain("replace every later safe occurrence");
+    expect(body.messages[0].content).toContain("output only NONE");
+    expect(body.messages[0].content).not.toContain("Examples:");
+    expect(body.messages[0].content).not.toContain("Inline variable rule");
+    expect(body.messages[0].content).not.toContain("worker-xy");
     expect(body.messages[0].content).not.toContain("Known /condense DSL memory");
     expect(body.messages[0].content).not.toContain("workspace=#w3");
   });
@@ -403,21 +395,53 @@ describe("summarizeBatch", () => {
     };
 
     expect(output).toBe("AUTH fixed");
-    expect(body.messages[0].content).toContain("Known /condense DSL memory");
-    expect(body.messages[0].content).toContain(
+    expect(body.messages[0].content).not.toContain("Known /condense DSL memory");
+    expect(body.messages[1].content).toContain("Known /condense DSL memory");
+    expect(body.messages[1].content).toContain(
       "AUTH = authentication fix (alias, project)"
     );
-    expect(body.messages[0].content).toContain("Inline variable rule");
-    expect(body.messages[0].content).toContain("Before every visible response");
-    expect(body.messages[0].content).toContain("Visible transcript is the canonical Dict state");
-    expect(body.messages[0].content).toContain("<term>=#<letter><digit>");
-    expect(body.messages[0].content).toContain("Dict delta rule");
-    expect(body.messages[0].content).toContain("do not repeat variables already defined");
-    expect(body.messages[0].content).toContain("Substitution pass");
-    expect(body.messages[0].content).toContain("exact model ID");
-    expect(body.messages[0].content).toContain("There is no fixed variable list");
+    expect(body.messages[0].content).toContain("output only NONE");
+    expect(body.messages[0].content).not.toContain("Examples:");
+    expect(body.messages[0].content).not.toContain("Inline variable rule");
     expect(body.messages[0].content).not.toContain("workspace=#w3");
-    expect(body.messages[0].content).toContain("Emit Dict+ only");
+    expect(body.messages[1].content).toContain("Emit Dict+ only");
+  });
+
+  it("keeps the batch system prompt stable and enables llama.cpp prompt cache locally", async () => {
+    const bodies: Array<{
+      cache_prompt?: boolean;
+      chat_template_kwargs?: { enable_thinking: boolean };
+      messages: Array<{ role: string; content: string }>;
+    }> = [];
+    const fetchImpl = async (_: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "PASS" } }]
+        }),
+        { status: 200 }
+      );
+    };
+
+    await summarizeBatch(baseConfig, "1 passed", fetchImpl);
+    await summarizeBatch(
+      {
+        ...baseConfig,
+        provider: "local",
+        host: "http://127.0.0.1:8009/v1"
+      },
+      "2 passed",
+      { dslMemory: "A = auth fix (alias, project)", ensureLocalServer: async () => undefined },
+      fetchImpl
+    );
+
+    expect(bodies[0].cache_prompt).toBeUndefined();
+    expect(bodies[1].cache_prompt).toBe(true);
+    expect(bodies[0].chat_template_kwargs).toBeUndefined();
+    expect(bodies[1].chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(bodies[0].messages[0].content).toBe(bodies[1].messages[0].content);
+    expect(bodies[1].messages[1].content).toContain("Known /condense DSL memory");
+    expect(bodies[1].messages[1].content).toContain("2 passed");
   });
 });
 

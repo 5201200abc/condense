@@ -12,6 +12,7 @@ export const DEFAULT_LOCAL_HOST = "127.0.0.1";
 export const DEFAULT_LOCAL_PORT = 8009;
 export const CONDENSE_MLX_MODEL = "samuelfaj/distill2-0.6B-4bit-MLX";
 export const CONDENSE_LLAMA_MODEL = "condense-local";
+export const CONDENSE_LLAMA_GGUF_FILENAME = "condense-0.8B-Q4_K_M.gguf";
 export const DEFAULT_IDLE_MS = 1_200;
 export const DEFAULT_INTERACTIVE_GAP_MS = 180;
 export const DEFAULT_PROGRESS_FRAME_MS = 120;
@@ -221,23 +222,17 @@ function coercePersistedLocalBackend(input: string | undefined): LocalBackend {
 }
 
 function localBackendForPlatform(
-  backend: LocalBackend,
-  platform = process.platform,
-  arch = process.arch
+  backend: LocalBackend
 ): Exclude<LocalBackend, "auto"> {
   if (backend !== "auto") {
     return backend;
   }
 
-  return platform === "darwin" && arch === "arm64" ? "mlx" : "llamacpp";
+  return "llamacpp";
 }
 
-function resolveLocalModel(
-  backend: LocalBackend,
-  platform = process.platform,
-  arch = process.arch
-): string {
-  return localBackendForPlatform(backend, platform, arch) === "mlx"
+function resolveLocalModel(backend: LocalBackend): string {
+  return localBackendForPlatform(backend) === "mlx"
     ? CONDENSE_MLX_MODEL
     : CONDENSE_LLAMA_MODEL;
 }
@@ -677,14 +672,15 @@ export function formatUsage(): string {
     "",
     "Options:",
     "  --stats               Print character savings summary to stderr on completion",
-    `  --model <name>        External model name (default local model: ${CONDENSE_MLX_MODEL})`,
+    `  --model <name>        External model name (default local model: ${CONDENSE_LLAMA_MODEL})`,
     `  --host <url>          External OpenAI-compatible base URL (default local: http://${DEFAULT_LOCAL_HOST}:${DEFAULT_LOCAL_PORT}/v1)`,
     "  --api-key <key>       API key (env: CONDENSE_API_KEY)",
     `  --timeout-ms <ms>     Request timeout in milliseconds (default: ${DEFAULT_TIMEOUT_MS})`,
     "",
     "Local model defaults:",
     `  CONDENSE_PROVIDER=external        Use an external OpenAI-compatible API`,
-    `  CONDENSE_LOCAL_BACKEND=mlx        Override local backend: auto, mlx, llamacpp`,
+    `  CONDENSE_LOCAL_BACKEND=llamacpp   Local backend (default auto -> llamacpp; mlx is opt-in)`,
+    `  CONDENSE_LLAMA_GGUF=<path>        Override v2 Q4 GGUF (default ${CONDENSE_LLAMA_GGUF_FILENAME})`,
     `  CONDENSE_LOCAL_CONCURRENCY=5      Max concurrent local model requests`,
     `  CONDENSE_LOCAL_PORT=${DEFAULT_LOCAL_PORT}       Local model server port`,
     "",

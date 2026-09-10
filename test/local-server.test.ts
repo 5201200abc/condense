@@ -9,7 +9,9 @@ import {
   ensureLocalServer,
   killLocalServer,
   probeLocalServer,
-  resolveLocalBackend
+  resolveLlamaGgufPath,
+  resolveLocalBackend,
+  stagePackagedGguf
 } from "../src/local-server";
 
 function localConfig(overrides: Partial<RuntimeConfig> = {}): RuntimeConfig {
@@ -20,7 +22,7 @@ function localConfig(overrides: Partial<RuntimeConfig> = {}): RuntimeConfig {
     localConcurrency: 5,
     localHost: "127.0.0.1",
     localPort: 8009,
-    model: "samuelfaj/distill2-0.6B-4bit-MLX",
+    model: "condense-local",
     host: "http://127.0.0.1:8009/v1",
     apiKey: "",
     timeoutMs: 90_000,
@@ -30,11 +32,12 @@ function localConfig(overrides: Partial<RuntimeConfig> = {}): RuntimeConfig {
 }
 
 describe("local server backend selection", () => {
-  it("uses MLX on Apple Silicon and llama.cpp elsewhere by default", () => {
-    expect(resolveLocalBackend("auto", "darwin", "arm64")).toBe("mlx");
+  it("uses llama.cpp on every platform by default", () => {
+    expect(resolveLocalBackend("auto", "darwin", "arm64")).toBe("llamacpp");
     expect(resolveLocalBackend("auto", "darwin", "x64")).toBe("llamacpp");
     expect(resolveLocalBackend("auto", "linux", "x64")).toBe("llamacpp");
     expect(resolveLocalBackend("auto", "win32", "x64")).toBe("llamacpp");
+    expect(resolveLocalBackend("mlx", "darwin", "arm64")).toBe("mlx");
     expect(resolveLocalBackend("llamacpp", "darwin", "arm64")).toBe("llamacpp");
   });
 
@@ -53,16 +56,18 @@ describe("local server backend selection", () => {
       "--prompt-cache-size",
       "0",
       "--prompt-cache-bytes",
-      "0"
+      "0",
+      "--chat-template-args",
+      '{"enable_thinking":false}'
     ]);
   });
 
   it("builds llama.cpp server args with parallel slots and continuous batching", () => {
-    expect(buildLocalServerArgs("llamacpp", localConfig())).toEqual([
-      "--hf-repo",
-      "samuelfaj/distill2-0.6B-4bit-GGUF:Q4_K_M",
-      "--hf-file",
-      "distill2-0.6B-Q4_K_M.GGUF",
+    expect(
+      buildLocalServerArgs("llamacpp", localConfig(), "/tmp/condense-0.8B-Q4_K_M.gguf")
+    ).toEqual([
+      "--model",
+      "/tmp/condense-0.8B-Q4_K_M.gguf",
       "--host",
       "127.0.0.1",
       "--port",
@@ -71,8 +76,44 @@ describe("local server backend selection", () => {
       "5",
       "--cont-batching",
       "--alias",
-      "condense-local"
+      "condense-local",
+      "--jinja",
+      "--ctx-size",
+      "20480",
+      "--chat-template-kwargs",
+      '{"enable_thinking":false}',
+      "--reasoning",
+      "off"
     ]);
+  });
+
+  it("resolves CONDENSE_LLAMA_GGUF before packaged and config-dir copies", () => {
+    expect(
+      resolveLlamaGgufPath({
+        CONDENSE_LLAMA_GGUF: "/tmp/condense-0.8B-Q4_K_M.gguf",
+        HOME: "/tmp/condense-home"
+      })
+    ).toBe("/tmp/condense-0.8B-Q4_K_M.gguf");
+  });
+
+  it("copies packaged v2 Q4 GGUF into the config models dir", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "condense-gguf-stage-"));
+    const packaged = path.join(root, "pkg", "training/gguf/v2");
+    const configDir = path.join(root, "config");
+
+    try {
+      await mkdir(packaged, { recursive: true });
+      await writeFile(path.join(packaged, "condense-0.8B-Q4_K_M.gguf"), "gguf");
+      const dest = await stagePackagedGguf({
+        CONDENSE_PACKAGE_ROOT: path.join(root, "pkg"),
+        CONDENSE_CONFIG_PATH: path.join(configDir, "config.json")
+      });
+      const staged = path.join(configDir, "models", "condense-0.8B-Q4_K_M.gguf");
+      expect(dest).toBe(staged);
+      expect(await readFile(staged, "utf8")).toBe("gguf");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -161,7 +202,7 @@ describe("ensureLocalServer", () => {
       },
       installRuntime: async (backend) => {
         events.push(`install-${backend}`);
-        return "/tmp/mlx_lm.server";
+        return "/tmp/llama-server";
       },
       spawnServer: async (runtimePath) => {
         events.push(`spawn-${runtimePath}`);
@@ -172,9 +213,43 @@ describe("ensureLocalServer", () => {
       "probe-1",
       "probe-2",
       "kill",
-      "install-mlx",
-      "spawn-/tmp/mlx_lm.server",
+      "install-llamacpp",
+      "spawn-/tmp/llama-server",
       "probe-3"
+    ]);
+  });
+
+  it("retries incompatible probes after spawn until the server is ready", async () => {
+    const events: string[] = [];
+    let probeCount = 0;
+
+    await ensureLocalServer(localConfig({ localBackend: "llamacpp" }), {
+      platform: "darwin",
+      arch: "arm64",
+      probeServer: async () => {
+        probeCount += 1;
+        events.push(`probe-${probeCount}`);
+        if (probeCount <= 2) {
+          return { status: "down" };
+        }
+        if (probeCount === 3) {
+          return { status: "incompatible" };
+        }
+        return { status: "ready" };
+      },
+      installRuntime: async () => "/tmp/llama-server",
+      spawnServer: async () => {
+        events.push("spawn");
+      },
+      sleepMs: async () => undefined
+    });
+
+    expect(events).toEqual([
+      "probe-1",
+      "probe-2",
+      "spawn",
+      "probe-3",
+      "probe-4"
     ]);
   });
 

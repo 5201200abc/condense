@@ -34,7 +34,7 @@
     "tokens",
     "llm",
     "agent",
-    "mlx",
+    "llama.cpp",
     "local-ai"
   ],
   "publishConfig": {

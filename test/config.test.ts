@@ -27,10 +27,7 @@ const defaultAutoLearnConfig = {
   maxPromptDslEntries: DEFAULT_MAX_PROMPT_DSL_ENTRIES,
   showStats: false
 };
-const expectedLocalModel =
-  process.platform === "darwin" && process.arch === "arm64"
-    ? "samuelfaj/distill2-0.6B-4bit-MLX"
-    : "condense-local";
+const expectedLocalModel = "condense-local";
 const expectedLocalHost = `http://${DEFAULT_LOCAL_HOST}:${DEFAULT_LOCAL_PORT}/v1`;
 
 describe("parseCommand", () => {
@@ -68,6 +65,15 @@ describe("parseCommand", () => {
 
   it("parses warmup command", () => {
     expect(parseCommand(["warmup"], {}, {})).toEqual({ kind: "warmup" });
+  });
+
+  it("defaults local provider to llama.cpp v2, not distill2", () => {
+    expect(resolveRuntimeDefaults({}, {})).toMatchObject({
+      provider: "local",
+      localBackend: DEFAULT_LOCAL_BACKEND,
+      model: expectedLocalModel
+    });
+    expect(expectedLocalModel).toBe("condense-local");
   });
 
   it("parses defaults and joins the question", () => {

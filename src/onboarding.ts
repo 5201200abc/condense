@@ -71,8 +71,6 @@ interface OnboardingOptions {
 type PrepareLocalModel = NonNullable<OnboardingOptions["prepareLocalModel"]>;
 
 const MLX_MODEL_REPO = "samuelfaj/distill2-0.6B-4bit-MLX";
-const LLAMA_MODEL_REPO = "samuelfaj/distill2-0.6B-4bit-GGUF";
-const LLAMA_MODEL_FILE = "distill2-0.6B-Q4_K_M.GGUF";
 const MLX_MODEL_FILES = [
   "added_tokens.json",
   "chat_template.jinja",
@@ -305,7 +303,7 @@ async function resolveRemoteFileBytes(
 
 async function resolveRemoteModelBytes(config: RuntimeConfig): Promise<number> {
   if (config.model === "condense-local") {
-    return resolveRemoteFileBytes(LLAMA_MODEL_REPO, LLAMA_MODEL_FILE);
+    return 0;
   }
 
   const sizes = await Promise.all(
@@ -324,8 +322,8 @@ async function startLocalModelProgress(
     return () => undefined;
   }
 
-  const repo = config.model === "condense-local" ? LLAMA_MODEL_REPO : MLX_MODEL_REPO;
-  const cacheDir = modelCacheDir(env, repo);
+  const cacheDir =
+    config.model === "condense-local" ? null : modelCacheDir(env, MLX_MODEL_REPO);
   const totalBytes = await resolveRemoteModelBytes(config);
   let lastPercent = -1;
   let stopped = false;
@@ -585,9 +583,9 @@ async function runTuiOnboarding(
           message: "Local backend",
           initialValue: currentLocalBackend,
           options: [
-            { value: "auto", label: "Auto", hint: "MLX on Apple Silicon, llama.cpp elsewhere" },
-            { value: "mlx", label: "MLX", hint: "macOS Apple Silicon" },
-            { value: "llamacpp", label: "llama.cpp", hint: "Linux, Windows, Intel Mac" }
+            { value: "auto", label: "Auto", hint: "llama.cpp + v2 Q4 GGUF on all platforms" },
+            { value: "llamacpp", label: "llama.cpp", hint: "resident llama-server, cache_prompt" },
+            { value: "mlx", label: "MLX (opt-in)", hint: "legacy distill2; not the default" }
           ]
         })
       );
@@ -784,7 +782,7 @@ export async function runOnboarding({
 
     if (provider === "local") {
       config.localBackend = parseLocalBackend(
-        await ask(`local-backend auto/mlx/llamacpp [${currentLocalBackend}]: `),
+        await ask(`local-backend auto/llamacpp/mlx [${currentLocalBackend}]: `),
         currentLocalBackend
       );
       config.localConcurrency = parsePositiveInteger(

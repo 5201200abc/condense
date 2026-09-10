@@ -125,104 +125,60 @@ fi
 
 echo "[condense] Successfully installed condense to $TARGET_FILE"
 
-hf_hub_cache() {
-  if [ -n "${HUGGINGFACE_HUB_CACHE:-}" ]; then
-    printf '%s\n' "$HUGGINGFACE_HUB_CACHE"
-    return
+prefetch_local_model() {
+  GGUF_NAME="condense-0.8B-Q4_K_M.gguf"
+  SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)" 2>/dev/null || SCRIPT_DIR=""
+  SRC_GGUF=""
+  for candidate in \
+    "${CONDENSE_LLAMA_GGUF:-}" \
+    "$SCRIPT_DIR/training/gguf/v2/$GGUF_NAME" \
+    "$(pwd)/training/gguf/v2/$GGUF_NAME"
+  do
+    if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+      SRC_GGUF="$candidate"
+      break
+    fi
+  done
+  MODEL_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/condense/models"
+  DEST="$MODEL_DIR/$GGUF_NAME"
+  if [ -n "$SRC_GGUF" ]; then
+    echo "[condense] Installing local v2 Q4 GGUF (~505 MB)..."
+    mkdir -p "$MODEL_DIR"
+    cp "$SRC_GGUF" "$DEST"
+    return 0
   fi
-  if [ -n "${HF_HUB_CACHE:-}" ]; then
-    printf '%s\n' "$HF_HUB_CACHE"
-    return
+  if [ -s "$DEST" ]; then
+    echo "[condense] Using cached $DEST"
+    return 0
   fi
-  if [ -n "${HF_HOME:-}" ]; then
-    printf '%s\n' "$HF_HOME/hub"
-    return
+  if [ -n "${VERSION:-}" ]; then
+    mkdir -p "$MODEL_DIR"
+    URL="https://github.com/${REPO}/releases/download/v${VERSION}/${GGUF_NAME}"
+    echo "[condense] Downloading $GGUF_NAME from GitHub release v${VERSION}..."
+    AUTH_HEADER=""
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+      AUTH_HEADER="Authorization: Bearer ${GITHUB_TOKEN}"
+    elif [ -n "${GH_TOKEN:-}" ]; then
+      AUTH_HEADER="Authorization: Bearer ${GH_TOKEN}"
+    fi
+    if [ -n "$AUTH_HEADER" ]; then
+      curl -fL --retry 3 --progress-bar -H "$AUTH_HEADER" "$URL" -o "$DEST"
+    else
+      curl -fL --retry 3 --progress-bar "$URL" -o "$DEST"
+    fi && [ -s "$DEST" ] && return 0
+    rm -f "$DEST"
   fi
-  if [ -n "${XDG_CACHE_HOME:-}" ]; then
-    printf '%s\n' "$XDG_CACHE_HOME/huggingface/hub"
-    return
-  fi
-  printf '%s\n' "$HOME/.cache/huggingface/hub"
-}
-
-prefetch_hf_repo() {
-  repo="$1"
-  shift
-  if command -v hf >/dev/null 2>&1; then
-    hf download "$repo" "$@" && return 0
-  fi
-  if command -v huggingface-cli >/dev/null 2>&1; then
-    huggingface-cli download "$repo" "$@" && return 0
-  fi
-  if command -v uv >/dev/null 2>&1; then
-    uvx --from huggingface_hub hf download "$repo" "$@" && return 0
-  fi
-  if command -v python3 >/dev/null 2>&1; then
-    CONDENSE_HF_REPO="$repo" CONDENSE_HF_FILES="$*" python3 - <<'PY' && return 0
-import os, sys
-try:
-    from huggingface_hub import snapshot_download
-except ImportError:
-    sys.exit(2)
-repo = os.environ["CONDENSE_HF_REPO"]
-files = [item for item in os.environ.get("CONDENSE_HF_FILES", "").split() if item]
-kwargs = {"allow_patterns": files} if files else {}
-snapshot_download(repo, **kwargs)
-PY
-  fi
+  echo "[condense] No packaged $GGUF_NAME found."
+  echo "  Place it at $DEST or set CONDENSE_LLAMA_GGUF."
   return 1
 }
 
-curl_hf_files() {
-  repo="$1"
-  shift
-  cache_root="$(hf_hub_cache)"
-  repo_dir="$cache_root/models--$(printf '%s' "$repo" | sed 's|/|--|g')"
-  first="$1"
-  resolved="$(curl -fsSL -o /dev/null -w '%{url_effective}' -L "https://huggingface.co/${repo}/resolve/main/${first}" || true)"
-  revision="$(printf '%s' "$resolved" | sed -n 's|.*/resolve/\([^/]*\)/.*|\1|p')"
-  if [ -z "$revision" ] || [ "$revision" = "main" ]; then
-    revision="main"
-  fi
-  snap_dir="$repo_dir/snapshots/$revision"
-  mkdir -p "$snap_dir" "$repo_dir/refs"
-  printf '%s\n' "$revision" > "$repo_dir/refs/main"
-  for file in "$@"; do
-    dest="$snap_dir/$file"
-    if [ -s "$dest" ]; then
-      echo "[condense] Cached $file"
-      continue
-    fi
-    echo "[condense] Downloading $file..."
-    mkdir -p "$(dirname "$dest")"
-    if ! curl -fL --retry 3 --progress-bar "https://huggingface.co/${repo}/resolve/main/${file}" -o "$dest"; then
-      return 1
-    fi
-  done
-  return 0
-}
-
-prefetch_local_model() {
-  if [ "$TARGET" = "darwin-arm64" ]; then
-    HF_REPO="samuelfaj/distill2-0.6B-4bit-MLX"
-    HF_FILES="added_tokens.json chat_template.jinja config.json generation_config.json merges.txt model.safetensors model.safetensors.index.json special_tokens_map.json tokenizer.json tokenizer_config.json vocab.json"
-  else
-    HF_REPO="samuelfaj/distill2-0.6B-4bit-GGUF"
-    HF_FILES="distill2-0.6B-Q4_K_M.GGUF"
-  fi
-  echo "[condense] Prefetching $HF_REPO (~404 MB)..."
-  # shellcheck disable=SC2086
-  prefetch_hf_repo "$HF_REPO" $HF_FILES && return 0
-  # shellcheck disable=SC2086
-  curl_hf_files "$HF_REPO" $HF_FILES
-}
-
 if [ "${CONDENSE_SKIP_WARMUP:-}" != "1" ]; then
-  echo "[condense] Downloading and loading local 0.6B model..."
+  echo "[condense] Staging local v2 Q4 GGUF..."
   if prefetch_local_model; then
     echo "[condense] Local model weights cached."
   else
-    echo "[condense] Warning: could not prefetch model weights from Hugging Face."
+    echo "[condense] Warning: v2 GGUF was not staged. llama.cpp will look at CONDENSE_LLAMA_GGUF, training/gguf/v2, or ~/.config/condense/models."
   fi
   if "$TARGET_FILE" --help 2>/dev/null | grep -q "condense warmup"; then
     if "$TARGET_FILE" warmup; then
