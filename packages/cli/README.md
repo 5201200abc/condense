@@ -19,13 +19,7 @@
 
 ## Installation
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
-```
-
-Installs the CLI and stages `training/gguf/v2/condense-0.8B-Q4_K_M.gguf` when that file is present (copied to `~/.config/condense/models/`). Skip warmup with `CONDENSE_SKIP_WARMUP=1`. Override the GGUF with `CONDENSE_LLAMA_GGUF`. Upgrade by running the same command. `condense update` prints the latest version.
-
-npm / bun (then load the model):
+CLI updates go through npm after CI publishes this package. There is no GitHub tarball.
 
 ```bash
 npm install -g condense
@@ -33,6 +27,10 @@ npm install -g condense
 bun add -g condense
 condense warmup
 ```
+
+`condense update` checks npm and prints `npm install -g condense@latest` when this project is the published package. Until CI has published it, public npm `condense` is a different project.
+
+From a checkout, `install.sh` compiles a local binary if npm is not this project. Place `training/gguf/v2/condense-0.8B-Q4_K_M.gguf` at `~/.config/condense/models/` or set `CONDENSE_LLAMA_GGUF`. Skip warmup with `CONDENSE_SKIP_WARMUP=1`.
 
 ## Agent setup
 

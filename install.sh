@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -e
 
-# condense universal installer for macOS & Linux
+# condense installer: npm global CLI, then optional local GGUF staging.
 # Usage: curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh
 
 REPO="5201200abc/condense"
@@ -43,55 +43,28 @@ PACKAGE_NAME="condense-${TARGET}"
 
 echo "[condense] Detected platform: ${TARGET}"
 
-# Determine target binary directory
 mkdir -p "$INSTALL_DIR"
 TARGET_FILE="$INSTALL_DIR/$BINARY_NAME"
+INSTALLED_BIN=""
 
-# Fetch latest version from GitHub releases
-VERSION="${CONDENSE_VERSION:-}"
-if [ -z "$VERSION" ]; then
-  VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | head -n 1 | cut -d'"' -f4 | sed 's/^v//' || echo "")
-fi
-
-if [ -n "$VERSION" ]; then
-  echo "[condense] Installing condense v${VERSION} to ${TARGET_FILE}..."
-else
-  echo "[condense] GitHub release version unavailable; trying local binaries..."
-fi
-
-DOWNLOAD_SUCCESS=0
-TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'condense-install')
-
-cleanup() {
-  rm -rf "$TMP_DIR"
+npm_condense_is_ours() {
+  command -v npm >/dev/null 2>&1 || return 1
+  url="$(npm view condense repository.url 2>/dev/null || true)"
+  [ -n "$url" ] && printf '%s' "$url" | grep -q '5201200abc/condense'
 }
-trap cleanup EXIT
 
-# 1. Try GitHub Releases standalone binary asset
-if [ -n "$VERSION" ]; then
-  GITHUB_RELEASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}/condense-${TARGET}"
-  if curl -fsSL "$GITHUB_RELEASE_URL" -o "$TARGET_FILE" 2>/dev/null && [ -s "$TARGET_FILE" ]; then
-    chmod +x "$TARGET_FILE"
-    DOWNLOAD_SUCCESS=1
+if npm_condense_is_ours; then
+  echo "[condense] Installing CLI from npm (condense@$(npm view condense version 2>/dev/null || echo latest))..."
+  npm install -g "condense@${CONDENSE_VERSION:-latest}"
+  INSTALLED_BIN="$(command -v condense || true)"
+else
+  if command -v npm >/dev/null 2>&1; then
+    echo "[condense] Public npm package condense is not this project; skipping npm install -g."
   fi
 fi
 
-# 2. Try GitHub Releases tarball
-if [ "$DOWNLOAD_SUCCESS" -ne 1 ] && [ -n "$VERSION" ]; then
-  GITHUB_TARBALL_URL="https://github.com/${REPO}/releases/download/v${VERSION}/condense-${TARGET}.tar.gz"
-  if curl -fsSL "$GITHUB_TARBALL_URL" -o "$TMP_DIR/release.tar.gz" 2>/dev/null && [ -s "$TMP_DIR/release.tar.gz" ]; then
-    if tar -xzf "$TMP_DIR/release.tar.gz" -C "$TMP_DIR" 2>/dev/null; then
-      if [ -f "$TMP_DIR/$BINARY_NAME" ]; then
-        cp "$TMP_DIR/$BINARY_NAME" "$TARGET_FILE"
-        chmod +x "$TARGET_FILE"
-        DOWNLOAD_SUCCESS=1
-      fi
-    fi
-  fi
-fi
-
-# 3. Try locally built binary in workspace if available
-if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then
+if [ -z "$INSTALLED_BIN" ]; then
+  DOWNLOAD_SUCCESS=0
   if [ -f "./.dist/bun-${TARGET}/condense" ]; then
     cp "./.dist/bun-${TARGET}/condense" "$TARGET_FILE"
     chmod +x "$TARGET_FILE"
@@ -106,15 +79,14 @@ if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then
     chmod +x "$TARGET_FILE"
     DOWNLOAD_SUCCESS=1
   fi
-fi
 
-if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then
-  echo "[condense] Error: Could not download prebuilt binary for ${TARGET}."
-  if [ -z "$VERSION" ]; then
-    echo "  GitHub releases/latest did not return a version. Set CONDENSE_VERSION or build from source."
+  if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then
+    echo "[condense] Error: CLI is not on npm for this project yet, and no local binary was found."
+    echo "  Install Node, then after CI publishes: npm install -g condense"
+    echo "  Or build from a checkout: bun run scripts/build-binaries.ts"
+    exit 1
   fi
-  echo "  Please check your network connection or build from source via: bun run scripts/build-binaries.ts"
-  exit 1
+  INSTALLED_BIN="$TARGET_FILE"
 fi
 
 if [ -f "./skills/condense/SKILL.md" ]; then
@@ -123,7 +95,7 @@ if [ -f "./skills/condense/SKILL.md" ]; then
   cp -R ./skills/condense/. "$SKILL_DEST/"
 fi
 
-echo "[condense] Successfully installed condense to $TARGET_FILE"
+echo "[condense] Successfully installed condense ($INSTALLED_BIN)"
 
 prefetch_local_model() {
   GGUF_NAME="condense-0.8B-Q4_K_M.gguf"
@@ -151,23 +123,6 @@ prefetch_local_model() {
     echo "[condense] Using cached $DEST"
     return 0
   fi
-  if [ -n "${VERSION:-}" ]; then
-    mkdir -p "$MODEL_DIR"
-    URL="https://github.com/${REPO}/releases/download/v${VERSION}/${GGUF_NAME}"
-    echo "[condense] Downloading $GGUF_NAME from GitHub release v${VERSION}..."
-    AUTH_HEADER=""
-    if [ -n "${GITHUB_TOKEN:-}" ]; then
-      AUTH_HEADER="Authorization: Bearer ${GITHUB_TOKEN}"
-    elif [ -n "${GH_TOKEN:-}" ]; then
-      AUTH_HEADER="Authorization: Bearer ${GH_TOKEN}"
-    fi
-    if [ -n "$AUTH_HEADER" ]; then
-      curl -fL --retry 3 --progress-bar -H "$AUTH_HEADER" "$URL" -o "$DEST"
-    else
-      curl -fL --retry 3 --progress-bar "$URL" -o "$DEST"
-    fi && [ -s "$DEST" ] && return 0
-    rm -f "$DEST"
-  fi
   echo "[condense] No packaged $GGUF_NAME found."
   echo "  Place it at $DEST or set CONDENSE_LLAMA_GGUF."
   return 1
@@ -180,8 +135,8 @@ if [ "${CONDENSE_SKIP_WARMUP:-}" != "1" ]; then
   else
     echo "[condense] Warning: v2 GGUF was not staged. llama.cpp will look at CONDENSE_LLAMA_GGUF, training/gguf/v2, or ~/.config/condense/models."
   fi
-  if "$TARGET_FILE" --help 2>/dev/null | grep -q "condense warmup"; then
-    if "$TARGET_FILE" warmup; then
+  if "$INSTALLED_BIN" --help 2>/dev/null | grep -q "condense warmup"; then
+    if "$INSTALLED_BIN" warmup; then
       echo "[condense] Local model ready."
     else
       echo "[condense] Warning: could not start the local model server now."
@@ -192,15 +147,16 @@ if [ "${CONDENSE_SKIP_WARMUP:-}" != "1" ]; then
   fi
 fi
 
-# Check PATH
-case ":$PATH:" in
-  *":$INSTALL_DIR:"*) ;;
-  *)
-    echo ""
-    echo "[condense] Notice: $INSTALL_DIR is not in your PATH."
-    echo "  Add it by running:"
-    echo "    export PATH=\"$INSTALL_DIR:\$PATH\""
-    echo "  Or add the line above to your ~/.zshrc or ~/.bashrc"
-    echo ""
-    ;;
-esac
+if [ "$INSTALLED_BIN" = "$TARGET_FILE" ]; then
+  case ":$PATH:" in
+    *":$INSTALL_DIR:"*) ;;
+    *)
+      echo ""
+      echo "[condense] Notice: $INSTALL_DIR is not in your PATH."
+      echo "  Add it by running:"
+      echo "    export PATH=\"$INSTALL_DIR:\$PATH\""
+      echo "  Or add the line above to your ~/.zshrc or ~/.bashrc"
+      echo ""
+      ;;
+  esac
+fi

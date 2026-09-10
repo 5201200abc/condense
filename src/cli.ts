@@ -25,6 +25,7 @@ import { runOnboarding, warmupLocalModel } from "./onboarding";
 import { runStatsCommand } from "./stats";
 import { CondenseSession, type ProgressPhase } from "./stream-condenser";
 import { resolveDatasetPath } from "./dataset";
+import { runUpgradeCommand } from "./upgrade";
 import {
   getPersistedConfigValue,
   readPersistedConfig,
@@ -49,48 +50,6 @@ async function readAllStdin(): Promise<string> {
   });
 
   return Buffer.concat(chunks).toString("utf8");
-}
-
-export async function runUpgradeCommand(): Promise<string> {
-  const currentVersion = CONDENSE_VERSION;
-  let latestVersion = "";
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(
-      "https://api.github.com/repos/5201200abc/condense/releases/latest",
-      {
-        headers: { "User-Agent": `condense/${currentVersion}` },
-        signal: controller.signal
-      }
-    );
-    clearTimeout(timer);
-
-    if (res.ok) {
-      const data = (await res.json()) as { tag_name?: string };
-      latestVersion = (data.tag_name ?? "").replace(/^v/, "").trim();
-    }
-  } catch {
-    // ignore network errors
-  }
-
-  const lines: string[] = [];
-  lines.push(`Current version: v${currentVersion}`);
-
-  if (latestVersion && latestVersion !== currentVersion) {
-    lines.push(`Latest version : v${latestVersion}`);
-    lines.push("");
-    lines.push("To upgrade condense, run:");
-    lines.push("  curl -fsSL https://raw.githubusercontent.com/5201200abc/condense/main/install.sh | sh");
-    lines.push("");
-    lines.push("Or via npm:");
-    lines.push("  npm install -g condense@latest");
-  } else {
-    lines.push("condense is up to date.");
-  }
-
-  return lines.join("\n") + "\n";
 }
 
 async function run(): Promise<number> {
