@@ -1,6 +1,6 @@
 {
   "name": "condense",
-  "version": "1.5.2",
+  "version": "0.1.0",
   "description": "Compress command output for downstream LLMs.",
   "license": "Apache-2.0",
   "bin": {
@@ -15,11 +15,11 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "condense-darwin-arm64": "1.5.2",
-    "condense-darwin-x64": "1.5.2",
-    "condense-linux-arm64": "1.5.2",
-    "condense-linux-x64": "1.5.2",
-    "condense-win32-x64": "1.5.2"
+    "condense-darwin-arm64": "0.1.0",
+    "condense-darwin-x64": "0.1.0",
+    "condense-linux-arm64": "0.1.0",
+    "condense-linux-x64": "0.1.0",
+    "condense-win32-x64": "0.1.0"
   },
   "author": "condense team (https://github.com/5201200abc/condense)",
   "homepage": "https://github.com/5201200abc/condense#readme",

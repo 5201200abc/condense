@@ -10,37 +10,37 @@
     },
     "packages/cli": {
       "name": "condense",
-      "version": "1.5.2",
+      "version": "0.1.0",
       "bin": {
         "condense": "bin/condense.js",
       },
       "optionalDependencies": {
-        "condense-darwin-arm64": "1.5.2",
-        "condense-darwin-x64": "1.5.2",
-        "condense-linux-arm64": "1.5.2",
-        "condense-linux-x64": "1.5.2",
-        "condense-win32-x64": "1.5.2",
+        "condense-darwin-arm64": "0.1.0",
+        "condense-darwin-x64": "0.1.0",
+        "condense-linux-arm64": "0.1.0",
+        "condense-linux-x64": "0.1.0",
+        "condense-win32-x64": "0.1.0",
       },
     },
     "packages/condense-darwin-arm64": {
       "name": "condense-darwin-arm64",
-      "version": "1.5.2",
+      "version": "0.1.0",
     },
     "packages/condense-darwin-x64": {
       "name": "condense-darwin-x64",
-      "version": "1.5.2",
+      "version": "0.1.0",
     },
     "packages/condense-linux-arm64": {
       "name": "condense-linux-arm64",
-      "version": "1.5.2",
+      "version": "0.1.0",
     },
     "packages/condense-linux-x64": {
       "name": "condense-linux-x64",
-      "version": "1.5.2",
+      "version": "0.1.0",
     },
     "packages/condense-win32-x64": {
       "name": "condense-win32-x64",
-      "version": "1.5.2",
+      "version": "0.1.0",
     },
   },
   "packages": {
