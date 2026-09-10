@@ -22,6 +22,54 @@ export interface ChatCompletionRequest {
   fetchImpl?: typeof fetch;
 }
 
+export interface CompletionTimings {
+  promptMs: number;
+  predictedMs: number;
+  promptN: number;
+  predictedN: number;
+  cacheN: number;
+  cacheSavedMs: number;
+}
+
+export interface ChatCompletionResult {
+  content: string;
+  timings?: CompletionTimings;
+}
+
+export function parseCompletionTimings(payload: unknown): CompletionTimings | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+  const timings = (payload as { timings?: Record<string, unknown> }).timings;
+  if (!timings || typeof timings !== "object") {
+    return undefined;
+  }
+  const promptN = Number(timings.prompt_n ?? 0);
+  const predictedN = Number(timings.predicted_n ?? 0);
+  const cacheN = Number(timings.cache_n ?? 0);
+  const promptMs = Number(timings.prompt_ms ?? 0);
+  const predictedMs = Number(timings.predicted_ms ?? 0);
+  if (
+    ![promptN, predictedN, cacheN, promptMs, predictedMs].some(
+      (value) => Number.isFinite(value) && value > 0
+    )
+  ) {
+    return undefined;
+  }
+  const cacheSavedMs =
+    cacheN > 0 && promptN > 0 && promptMs > 0
+      ? Math.round((cacheN / promptN) * promptMs)
+      : 0;
+  return {
+    promptMs: Number.isFinite(promptMs) ? promptMs : 0,
+    predictedMs: Number.isFinite(predictedMs) ? predictedMs : 0,
+    promptN: Number.isFinite(promptN) ? promptN : 0,
+    predictedN: Number.isFinite(predictedN) ? predictedN : 0,
+    cacheN: Number.isFinite(cacheN) ? cacheN : 0,
+    cacheSavedMs
+  };
+}
+
 interface SummarizeOptions {
   dslMemory?: string;
   ensureLocalServer?: (config: RuntimeConfig) => Promise<void>;
@@ -102,7 +150,13 @@ function releaseLocalRequestSlot(key: string, gate: LocalRequestGate): void {
   }
 }
 
-export async function chatCompletion({
+export async function chatCompletion(
+  request: ChatCompletionRequest
+): Promise<string> {
+  return (await chatCompletionDetailed(request)).content;
+}
+
+export async function chatCompletionDetailed({
   baseUrl,
   apiKey,
   model,
@@ -112,7 +166,7 @@ export async function chatCompletion({
   temperature,
   cachePrompt,
   fetchImpl = fetch
-}: ChatCompletionRequest): Promise<string> {
+}: ChatCompletionRequest): Promise<ChatCompletionResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -177,7 +231,7 @@ export async function chatCompletion({
       throw new Error("Provider returned an empty response.");
     }
 
-    return content;
+    return { content, timings: parseCompletionTimings(payload) };
   } finally {
     clearTimeout(timeout);
   }
@@ -189,13 +243,13 @@ async function summarize(
   fetchImpl?: typeof fetch,
   ensureLocalServerImpl: (config: RuntimeConfig) => Promise<void> = ensureLocalServer,
   killLocalServerImpl: (env: NodeJS.ProcessEnv) => Promise<boolean> = killLocalServer
-): Promise<string> {
+): Promise<ChatCompletionResult> {
   if (config.provider === "local") {
     await ensureLocalServerImpl(config);
   }
 
   const request = () =>
-    chatCompletion({
+    chatCompletionDetailed({
       baseUrl: config.host,
       apiKey: config.apiKey,
       model: config.model,
@@ -228,12 +282,22 @@ async function summarize(
   });
 }
 
-export function summarizeBatch(
+export async function summarizeBatch(
   config: RuntimeConfig,
   input: string,
   optionsOrFetchImpl: SummarizeOptions | typeof fetch = {},
   fetchImpl?: typeof fetch
 ): Promise<string> {
+  return (await summarizeBatchDetailed(config, input, optionsOrFetchImpl, fetchImpl))
+    .content;
+}
+
+export async function summarizeBatchDetailed(
+  config: RuntimeConfig,
+  input: string,
+  optionsOrFetchImpl: SummarizeOptions | typeof fetch = {},
+  fetchImpl?: typeof fetch
+): Promise<ChatCompletionResult> {
   const options =
     typeof optionsOrFetchImpl === "function" ? {} : optionsOrFetchImpl;
   const resolvedFetchImpl =
@@ -255,51 +319,56 @@ export function summarizeBatch(
   );
 }
 
-export function summarizeTranslate(
+export async function summarizeTranslate(
   config: RuntimeConfig,
   text: string,
   language: string,
   fetchImpl?: typeof fetch
 ): Promise<string> {
-  return summarize(config, buildTranslatePrompt(text, language), fetchImpl);
+  return (await summarize(config, buildTranslatePrompt(text, language), fetchImpl))
+    .content;
 }
 
-export function summarizeWatch(
+export async function summarizeWatch(
   config: RuntimeConfig,
   previousCycle: string,
   currentCycle: string,
   fetchImpl?: typeof fetch
 ): Promise<string> {
-  return summarize(
-    config,
-    buildWatchPrompt(
-      config.question,
-      previousCycle,
-      currentCycle,
-      config.provider === "local" ? LOCAL_MAX_INPUT_CHARS / 2 : undefined
-    ),
-    fetchImpl
-  );
+  return (
+    await summarize(
+      config,
+      buildWatchPrompt(
+        config.question,
+        previousCycle,
+        currentCycle,
+        config.provider === "local" ? LOCAL_MAX_INPUT_CHARS / 2 : undefined
+      ),
+      fetchImpl
+    )
+  ).content;
 }
 
-export function summarizeDslPromotion(
+export async function summarizeDslPromotion(
   config: RuntimeConfig,
   entries: string,
   fetchImpl?: typeof fetch
 ): Promise<string> {
-  return summarize(config, buildDslPromotionPrompt(entries), fetchImpl);
+  return (await summarize(config, buildDslPromotionPrompt(entries), fetchImpl)).content;
 }
 
-export function summarizeThreadLearn(
+export async function summarizeThreadLearn(
   config: RuntimeConfig,
   transcript: string,
   candidates: Parameters<typeof buildThreadLearnPrompt>[1],
   dslMemory: string,
   fetchImpl?: typeof fetch
 ): Promise<string> {
-  return summarize(
-    config,
-    buildThreadLearnPrompt(transcript, candidates, dslMemory),
-    fetchImpl
-  );
+  return (
+    await summarize(
+      config,
+      buildThreadLearnPrompt(transcript, candidates, dslMemory),
+      fetchImpl
+    )
+  ).content;
 }

@@ -22,6 +22,11 @@ export interface SingleRunStat {
   savedTokens: number;
   durationMs: number;
   charCompressionRatio: number;
+  cacheN?: number;
+  promptN?: number;
+  promptMs?: number;
+  predictedMs?: number;
+  cacheSavedMs?: number;
 }
 
 export interface MetricSummary {
@@ -36,6 +41,9 @@ export interface MetricSummary {
   outputTokens: number;
   savedTokens: number;
   durationMs: number;
+  cacheN: number;
+  promptN: number;
+  cacheSavedMs: number;
 }
 
 export interface ProjectMetricSummary extends MetricSummary {
@@ -60,6 +68,11 @@ export interface RecordCondenseRunOptions {
   output: string;
   durationMs: number;
   now?: Date;
+  cacheN?: number;
+  promptN?: number;
+  promptMs?: number;
+  predictedMs?: number;
+  cacheSavedMs?: number;
 }
 
 export interface FormatStatsOptions {
@@ -97,7 +110,10 @@ function emptyMetricSummary(): MetricSummary {
     inputTokens: 0,
     outputTokens: 0,
     savedTokens: 0,
-    durationMs: 0
+    durationMs: 0,
+    cacheN: 0,
+    promptN: 0,
+    cacheSavedMs: 0
   };
 }
 
@@ -175,6 +191,9 @@ function normalizeSummaryTokens(summary: Partial<MetricSummary>): MetricSummary 
   const outputTokens = summary.outputTokens ?? Math.round(outputChars / 4);
   const savedTokens = summary.savedTokens ?? Math.max(0, inputTokens - outputTokens);
   const durationMs = summary.durationMs ?? 0;
+  const cacheN = summary.cacheN ?? 0;
+  const promptN = summary.promptN ?? 0;
+  const cacheSavedMs = summary.cacheSavedMs ?? 0;
 
   return {
     calls,
@@ -187,7 +206,10 @@ function normalizeSummaryTokens(summary: Partial<MetricSummary>): MetricSummary 
     inputTokens,
     outputTokens,
     savedTokens,
-    durationMs
+    durationMs,
+    cacheN,
+    promptN,
+    cacheSavedMs
   };
 }
 
@@ -267,6 +289,9 @@ function updateMetricSummary(
     outputTokens?: number;
     savedTokens?: number;
     durationMs: number;
+    cacheN?: number;
+    promptN?: number;
+    cacheSavedMs?: number;
   }
 ): void {
   target.calls += 1;
@@ -282,6 +307,9 @@ function updateMetricSummary(
     run.savedTokens ??
     Math.max(0, (run.inputTokens ?? Math.round(run.inputChars / 4)) - (run.outputTokens ?? Math.round(run.outputChars / 4)));
   target.durationMs += run.durationMs;
+  target.cacheN += run.cacheN ?? 0;
+  target.promptN += run.promptN ?? 0;
+  target.cacheSavedMs += run.cacheSavedMs ?? 0;
 }
 
 function addMetricSummary(target: MetricSummary, source: MetricSummary): void {
@@ -296,6 +324,9 @@ function addMetricSummary(target: MetricSummary, source: MetricSummary): void {
   target.outputTokens += source.outputTokens;
   target.savedTokens += source.savedTokens;
   target.durationMs += source.durationMs;
+  target.cacheN += source.cacheN;
+  target.promptN += source.promptN;
+  target.cacheSavedMs += source.cacheSavedMs;
 }
 
 function subtractMetricSummary(target: MetricSummary, source: MetricSummary): void {
@@ -310,6 +341,9 @@ function subtractMetricSummary(target: MetricSummary, source: MetricSummary): vo
   target.outputTokens = Math.max(0, target.outputTokens - source.outputTokens);
   target.savedTokens = Math.max(0, target.savedTokens - source.savedTokens);
   target.durationMs = Math.max(0, target.durationMs - source.durationMs);
+  target.cacheN = Math.max(0, target.cacheN - source.cacheN);
+  target.promptN = Math.max(0, target.promptN - source.promptN);
+  target.cacheSavedMs = Math.max(0, target.cacheSavedMs - source.cacheSavedMs);
 }
 
 function resolveRunDescription(question?: string, rawInput?: string): string {
@@ -368,7 +402,12 @@ export async function recordCondenseRun(
         outputTokens,
         savedTokens,
         durationMs,
-        charCompressionRatio
+        charCompressionRatio,
+        cacheN: Math.max(0, Math.round(options.cacheN ?? 0)),
+        promptN: Math.max(0, Math.round(options.promptN ?? 0)),
+        promptMs: Math.max(0, Math.round(options.promptMs ?? 0)),
+        predictedMs: Math.max(0, Math.round(options.predictedMs ?? 0)),
+        cacheSavedMs: Math.max(0, Math.round(options.cacheSavedMs ?? 0))
       };
 
       const stats = await readStatsFile(env, now);
@@ -467,8 +506,24 @@ export async function resetStats(
   );
 }
 
+export function formatSeconds(ms: number): string {
+  const seconds = Math.max(0, ms) / 1000;
+  if (seconds < 10) {
+    return `${seconds.toFixed(2)}s`;
+  }
+  return `${seconds.toFixed(1)}s`;
+}
+
 export function formatSingleRunSummary(stat: SingleRunStat): string {
-  return `[condense] ${stat.inputChars.toLocaleString()} chars -> ${stat.outputChars.toLocaleString()} chars (${stat.charCompressionRatio.toFixed(1)}% chars saved, ${stat.durationMs}ms)`;
+  const parts = [
+    `${stat.inputChars.toLocaleString()} chars -> ${stat.outputChars.toLocaleString()} chars`,
+    `${stat.charCompressionRatio.toFixed(1)}% chars saved`,
+    formatSeconds(stat.durationMs)
+  ];
+  if ((stat.cacheN ?? 0) > 0) {
+    parts.push(`cache ${stat.cacheN} tok saved ${formatSeconds(stat.cacheSavedMs ?? 0)}`);
+  }
+  return `[condense] ${parts[0]} (${parts.slice(1).join(", ")})`;
 }
 
 function calculatePercentage(saved: number, total: number): string {
@@ -595,6 +650,11 @@ export function formatStatsReport(
       targetSummary.calls > 0
         ? Math.round(targetSummary.durationMs / targetSummary.calls)
         : 0;
+    const cacheTokens = targetSummary.cacheN + targetSummary.promptN;
+    const cacheHitRatio =
+      cacheTokens > 0
+        ? Number(((targetSummary.cacheN / cacheTokens) * 100).toFixed(2))
+        : 0;
 
     return `${JSON.stringify(
       {
@@ -604,7 +664,10 @@ export function formatStatsReport(
           charCompressionRatio,
           lineCompressionRatio,
           tokenCompressionRatio,
-          avgDurationMs
+          avgDurationMs,
+          avgDurationS: Number((avgDurationMs / 1000).toFixed(3)),
+          cacheHitRatio,
+          cacheSavedS: Number((targetSummary.cacheSavedMs / 1000).toFixed(3))
         },
         byProject: stats.byProject,
         daily: stats.daily,
@@ -645,7 +708,15 @@ export function formatStatsReport(
   lines.push("------------------------------------------------------------");
   lines.push(`Chars Saved            : ${targetSummary.savedChars.toLocaleString()} chars (${charRatio})`);
   lines.push(`Lines Saved            : ${targetSummary.savedLines.toLocaleString()} lines (${lineRatio})`);
-  lines.push(`Avg Latency            : ${avgDurationMs} ms`);
+  lines.push(`Avg Latency            : ${formatSeconds(avgDurationMs)}`);
+  const cacheTokens = targetSummary.cacheN + targetSummary.promptN;
+  if (cacheTokens > 0) {
+    const cacheHit = calculatePercentage(targetSummary.cacheN, cacheTokens);
+    lines.push(
+      `Prompt cache           : ${targetSummary.cacheN.toLocaleString()} / ${cacheTokens.toLocaleString()} tok (${cacheHit})`
+    );
+    lines.push(`Cache time saved       : ${formatSeconds(targetSummary.cacheSavedMs)}`);
+  }
   lines.push("============================================================");
 
   const historyLimit = options.history ? 50 : 10;

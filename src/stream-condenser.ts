@@ -17,6 +17,7 @@ import {
   normalizeForModel,
   structuralSimilarity
 } from "./text";
+import type { CompletionTimings } from "./llm";
 import {
   formatSingleRunSummary,
   recordCondenseRun,
@@ -39,8 +40,13 @@ const PROGRESS_LABELS: Record<ProgressPhase, string> = {
   summarizing: "condense: summarizing"
 };
 
+export interface SummarizeBatchResult {
+  content: string;
+  timings?: CompletionTimings;
+}
+
 export interface Summarizer {
-  summarizeBatch(input: string): Promise<string>;
+  summarizeBatch(input: string): Promise<string | SummarizeBatchResult>;
   summarizeWatch(previousCycle: string, currentCycle: string): Promise<string>;
 }
 
@@ -166,8 +172,12 @@ export class CondenseSession {
     try {
       this.setProgressPhase("summarizing");
       const summarizeStartedAt = Date.now();
-      const summary = await this.summarizer.summarizeBatch(normalizedInput);
+      const batchResult = await this.summarizer.summarizeBatch(normalizedInput);
       const durationMs = Date.now() - summarizeStartedAt;
+      const summary =
+        typeof batchResult === "string" ? batchResult : batchResult.content;
+      const timings =
+        typeof batchResult === "string" ? undefined : batchResult.timings;
 
       if (looksLikeBadDistillation(normalizedInput, summary)) {
         this.stopProgress(true);
@@ -180,7 +190,7 @@ export class CondenseSession {
       this.stdout.write(ensureTrailingNewline(output));
       await this.captureDatasetRecord(normalizedInput, output);
       await this.captureDslLearning(output);
-      await this.captureStatsRecord(rawInput, output, durationMs);
+      await this.captureStatsRecord(rawInput, output, durationMs, timings);
     } catch {
       this.stopProgress(true);
       this.stdout.write(Buffer.concat(this.rawBuffers));
@@ -190,7 +200,8 @@ export class CondenseSession {
   private async captureStatsRecord(
     rawInput: string,
     output: string,
-    durationMs: number
+    durationMs: number,
+    timings?: CompletionTimings
   ): Promise<SingleRunStat | undefined> {
     if (!this.runtimeConfig) {
       return undefined;
@@ -202,7 +213,12 @@ export class CondenseSession {
         question: this.runtimeConfig.question,
         rawInput,
         output,
-        durationMs
+        durationMs,
+        cacheN: timings?.cacheN,
+        promptN: timings?.promptN,
+        promptMs: timings?.promptMs,
+        predictedMs: timings?.predictedMs,
+        cacheSavedMs: timings?.cacheSavedMs
       });
 
       if (this.onBatchStat) {

@@ -15,7 +15,7 @@ import {
   type DslThreadLearnReview
 } from "./dsl-memory";
 import {
-  summarizeBatch,
+  summarizeBatchDetailed,
   summarizeDslPromotion,
   summarizeThreadLearn,
   summarizeTranslate,
@@ -230,7 +230,7 @@ async function run(): Promise<number> {
   const session = new CondenseSession({
     summarizer: {
       summarizeBatch: (input) =>
-        summarizeBatch(command.config, input, { dslMemory: promptDslMemory }),
+        summarizeBatchDetailed(command.config, input, { dslMemory: promptDslMemory }),
       summarizeWatch: (previous, current) =>
         summarizeWatch(command.config, previous, current)
     },

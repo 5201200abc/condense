@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   chatCompletion,
+  parseCompletionTimings,
   summarizeBatch,
   summarizeTranslate,
   summarizeWatch
@@ -21,6 +22,29 @@ const baseConfig: RuntimeConfig = {
   timeoutMs: 100,
   datasetEnabled: false
 };
+
+describe("parseCompletionTimings", () => {
+  it("estimates cache-saved milliseconds from llama.cpp timings", () => {
+    expect(
+      parseCompletionTimings({
+        timings: {
+          cache_n: 268,
+          prompt_n: 53,
+          prompt_ms: 58,
+          predicted_ms: 82,
+          predicted_n: 9
+        }
+      })
+    ).toEqual({
+      cacheN: 268,
+      promptN: 53,
+      promptMs: 58,
+      predictedMs: 82,
+      predictedN: 9,
+      cacheSavedMs: 293
+    });
+  });
+});
 
 describe("chatCompletion", () => {
   it("preserves nested base paths", async () => {

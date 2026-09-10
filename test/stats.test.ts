@@ -129,8 +129,45 @@ describe("stats module", () => {
       charCompressionRatio: 96.0
     });
 
-    expect(summary).toBe("[condense] 1,000 chars -> 40 chars (96.0% chars saved, 150ms)");
+    expect(summary).toBe("[condense] 1,000 chars -> 40 chars (96.0% chars saved, 0.15s)");
     expect(EMOJI_REGEX.test(summary)).toBe(false);
+  });
+
+  it("records prompt cache tokens and formats saved seconds", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-stats-cache-"));
+    const env = { CONDENSE_CONFIG_PATH: path.join(dir, "config.json") };
+
+    try {
+      const run = await recordCondenseRun(env, {
+        cwd: "/cache-project",
+        question: "Did tests pass?",
+        rawInput: "1 passed\n",
+        output: "PASS",
+        durationMs: 142,
+        cacheN: 268,
+        promptN: 53,
+        promptMs: 58,
+        predictedMs: 82,
+        cacheSavedMs: 293
+      });
+
+      expect(run.cacheN).toBe(268);
+      expect(run.promptN).toBe(53);
+      expect(run.cacheSavedMs).toBe(293);
+      expect(formatSingleRunSummary(run)).toContain("0.14s");
+      expect(formatSingleRunSummary(run)).toContain("cache 268 tok saved 0.29s");
+
+      const stats = await readStatsFile(env);
+      expect(stats.totals.cacheN).toBe(268);
+      expect(stats.totals.promptN).toBe(53);
+      expect(stats.totals.cacheSavedMs).toBe(293);
+      const report = formatStatsReport(stats);
+      expect(report).toContain("Prompt cache           : 268 / 321 tok");
+      expect(report).toContain("Cache time saved       : 0.29s");
+      expect(report).toContain("Avg Latency            : 0.14s");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("formats global character savings report without emojis", async () => {
@@ -144,7 +181,10 @@ describe("stats module", () => {
         inputLines: 500,
         outputLines: 15,
         savedLines: 485,
-        durationMs: 3000
+        durationMs: 3000,
+        cacheN: 0,
+        promptN: 0,
+        cacheSavedMs: 0
       },
       byProject: {
         proj1: {
@@ -156,7 +196,10 @@ describe("stats module", () => {
           inputLines: 500,
           outputLines: 15,
           savedLines: 485,
-          durationMs: 3000
+          durationMs: 3000,
+          cacheN: 0,
+          promptN: 0,
+          cacheSavedMs: 0
         }
       },
       daily: {},
@@ -170,7 +213,7 @@ describe("stats module", () => {
     expect(report).toContain("Total Executions       : 10 calls");
     expect(report).toContain("Chars Saved            : 9,500 chars (95.00%)");
     expect(report).toContain("Lines Saved            : 485 lines (97.00%)");
-    expect(report).toContain("Avg Latency            : 300 ms");
+    expect(report).toContain("Avg Latency            : 0.30s");
     expect(report).not.toContain("By Task");
     expect(report).not.toContain("$");
     expect(EMOJI_REGEX.test(report)).toBe(false);
@@ -187,7 +230,10 @@ describe("stats module", () => {
         inputLines: 200,
         outputLines: 10,
         savedLines: 190,
-        durationMs: 1500
+        durationMs: 1500,
+        cacheN: 0,
+        promptN: 0,
+        cacheSavedMs: 0
       },
       byProject: {},
       daily: {},
