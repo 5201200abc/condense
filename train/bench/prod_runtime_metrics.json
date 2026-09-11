@@ -1,0 +1,145 @@
+{
+  "warmup_status": 0,
+  "uncached_prompt_ms_median": 211.41,
+  "uncached_wall_ms_median": 287.65,
+  "cached_prompt_ms_median": 57.78,
+  "cached_wall_ms_median": 141.62,
+  "cached_cache_n_median": 268.0,
+  "cached_prompt_n_median": 53.0,
+  "fallback_sec": 0.56,
+  "fallback_status": 0,
+  "fallback_pred": "FAIL src/queue.test.ts",
+  "fallback_restarted": true,
+  "uncached": [
+    {
+      "wall_ms": 238.25,
+      "prompt_ms": 193.629,
+      "prompt_n": 320,
+      "cache_n": 0,
+      "predicted_ms": 10.961,
+      "predicted_n": 2,
+      "content": "PASS"
+    },
+    {
+      "wall_ms": 281.06,
+      "prompt_ms": 199.381,
+      "prompt_n": 320,
+      "cache_n": 0,
+      "predicted_ms": 78.789,
+      "predicted_n": 8,
+      "content": "FAIL test/auth_1.test.ts"
+    },
+    {
+      "wall_ms": 287.65,
+      "prompt_ms": 204.887,
+      "prompt_n": 320,
+      "cache_n": 0,
+      "predicted_ms": 79.08,
+      "predicted_n": 8,
+      "content": "FAIL test/auth_2.test.ts"
+    },
+    {
+      "wall_ms": 286.1,
+      "prompt_ms": 211.406,
+      "prompt_n": 320,
+      "cache_n": 0,
+      "predicted_ms": 71.743,
+      "predicted_n": 8,
+      "content": "PASS test/auth_3.test.ts"
+    },
+    {
+      "wall_ms": 293.85,
+      "prompt_ms": 214.324,
+      "prompt_n": 320,
+      "cache_n": 0,
+      "predicted_ms": 72.078,
+      "predicted_n": 8,
+      "content": "FAIL test/auth_4.test.ts"
+    },
+    {
+      "wall_ms": 289.17,
+      "prompt_ms": 213.923,
+      "prompt_n": 320,
+      "cache_n": 0,
+      "predicted_ms": 72.134,
+      "predicted_n": 8,
+      "content": "FAIL test/auth_5.test.ts"
+    }
+  ],
+  "cached": [
+    {
+      "wall_ms": 147.0,
+      "prompt_ms": 62.021,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 81.799,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_0.test.ts"
+    },
+    {
+      "wall_ms": 140.62,
+      "prompt_ms": 57.127,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 80.717,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_1.test.ts"
+    },
+    {
+      "wall_ms": 140.39,
+      "prompt_ms": 58.517,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 79.079,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_2.test.ts"
+    },
+    {
+      "wall_ms": 143.56,
+      "prompt_ms": 60.325,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 80.113,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_3.test.ts"
+    },
+    {
+      "wall_ms": 141.62,
+      "prompt_ms": 57.649,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 81.162,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_4.test.ts"
+    },
+    {
+      "wall_ms": 143.94,
+      "prompt_ms": 60.589,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 79.486,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_5.test.ts"
+    },
+    {
+      "wall_ms": 141.64,
+      "prompt_ms": 57.779,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 80.845,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_6.test.ts"
+    },
+    {
+      "wall_ms": 141.53,
+      "prompt_ms": 57.642,
+      "prompt_n": 53,
+      "cache_n": 268,
+      "predicted_ms": 80.956,
+      "predicted_n": 9,
+      "content": "FAIL test/queue_7.test.ts"
+    }
+  ],
+  "prompt_ms_ratio": 0.273,
+  "prompt_ms_drop_pct": 72.7
+}

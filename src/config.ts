@@ -76,6 +76,7 @@ export type Command =
   | { kind: "upgrade" }
   | { kind: "dsl"; args: string[] }
   | { kind: "stats"; args: string[] }
+  | { kind: "recall"; args: string[] }
   | { kind: "configShow" }
   | { kind: "configGet"; key: ConfigKey }
   | { kind: "configSet"; key: ConfigKey; value: string | number | boolean }
@@ -493,6 +494,10 @@ export function parseCommand(
     return { kind: "stats", args: argv.slice(1) };
   }
 
+  if (argv[0] === "recall") {
+    return { kind: "recall", args: argv.slice(1) };
+  }
+
   if (argv[0] === "upgrade" || argv[0] === "update") {
     return { kind: "upgrade" };
   }
@@ -655,6 +660,9 @@ export function formatUsage(): string {
     "  condense stats --json",
     "  condense stats --days 7",
     "  condense stats --reset",
+    "  condense recall <id>",
+    "  condense recall <id> --grep <pattern>",
+    "  condense recall <id> --around <pattern> -C 20",
     "  condense onboard",
     "  condense warmup",
     "  condense update",

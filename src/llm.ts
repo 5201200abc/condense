@@ -19,6 +19,7 @@ export interface ChatCompletionRequest {
   maxTokens?: number;
   temperature?: number;
   cachePrompt?: boolean;
+  chatTemplateKwargs?: Record<string, unknown>;
   fetchImpl?: typeof fetch;
 }
 
@@ -34,6 +35,21 @@ export interface CompletionTimings {
 export interface ChatCompletionResult {
   content: string;
   timings?: CompletionTimings;
+}
+
+export function estimateCacheSavedMs(
+  cacheN: number,
+  promptN: number,
+  promptMs: number
+): number {
+  if (cacheN <= 0 || promptN <= 0 || promptMs <= 0) {
+    return 0;
+  }
+  // Tiny prompt_n is mostly kernel overhead, so tok/s is not a real prefill rate.
+  if (promptN < 24) {
+    return 0;
+  }
+  return Math.round((cacheN / promptN) * promptMs);
 }
 
 export function parseCompletionTimings(payload: unknown): CompletionTimings | undefined {
@@ -56,10 +72,7 @@ export function parseCompletionTimings(payload: unknown): CompletionTimings | un
   ) {
     return undefined;
   }
-  const cacheSavedMs =
-    cacheN > 0 && promptN > 0 && promptMs > 0
-      ? Math.round((cacheN / promptN) * promptMs)
-      : 0;
+  const cacheSavedMs = estimateCacheSavedMs(cacheN, promptN, promptMs);
   return {
     promptMs: Number.isFinite(promptMs) ? promptMs : 0,
     predictedMs: Number.isFinite(predictedMs) ? predictedMs : 0,
@@ -165,6 +178,7 @@ export async function chatCompletionDetailed({
   maxTokens,
   temperature,
   cachePrompt,
+  chatTemplateKwargs,
   fetchImpl = fetch
 }: ChatCompletionRequest): Promise<ChatCompletionResult> {
   const controller = new AbortController();
@@ -190,12 +204,8 @@ export async function chatCompletionDetailed({
         messages,
         temperature: temperature ?? 0,
         ...(maxTokens ? { max_tokens: maxTokens } : {}),
-        ...(cachePrompt
-          ? {
-              cache_prompt: true,
-              chat_template_kwargs: { enable_thinking: false }
-            }
-          : {})
+        ...(cachePrompt ? { cache_prompt: true } : {}),
+        ...(chatTemplateKwargs ? { chat_template_kwargs: chatTemplateKwargs } : {})
       }),
       signal: controller.signal
     });
@@ -258,6 +268,7 @@ async function summarize(
       temperature: 0,
       maxTokens: 512,
       cachePrompt: config.provider === "local",
+      chatTemplateKwargs: config.provider === "local" ? { enable_thinking: false } : undefined,
       fetchImpl
     });
 

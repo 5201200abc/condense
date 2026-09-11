@@ -584,7 +584,7 @@ async function runTuiOnboarding(
           initialValue: currentLocalBackend,
           options: [
             { value: "auto", label: "Auto", hint: "llama.cpp + v2 Q4 GGUF on all platforms" },
-            { value: "llamacpp", label: "llama.cpp", hint: "resident llama-server, cache_prompt" },
+            { value: "llamacpp", label: "llama.cpp", hint: "resident llama-server" },
             { value: "mlx", label: "MLX (opt-in)", hint: "legacy distill2; not the default" }
           ]
         })

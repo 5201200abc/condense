@@ -103,8 +103,8 @@ prefetch_local_model() {
   SRC_GGUF=""
   for candidate in \
     "${CONDENSE_LLAMA_GGUF:-}" \
-    "$SCRIPT_DIR/training/gguf/v2/$GGUF_NAME" \
-    "$(pwd)/training/gguf/v2/$GGUF_NAME"
+    "$SCRIPT_DIR/train/gguf/v2/$GGUF_NAME" \
+    "$(pwd)/train/gguf/v2/$GGUF_NAME"
   do
     if [ -n "$candidate" ] && [ -f "$candidate" ]; then
       SRC_GGUF="$candidate"
@@ -133,7 +133,7 @@ if [ "${CONDENSE_SKIP_WARMUP:-}" != "1" ]; then
   if prefetch_local_model; then
     echo "[condense] Local model weights cached."
   else
-    echo "[condense] Warning: v2 GGUF was not staged. llama.cpp will look at CONDENSE_LLAMA_GGUF, training/gguf/v2, or ~/.config/condense/models."
+    echo "[condense] Warning: v2 GGUF was not staged. llama.cpp will look at CONDENSE_LLAMA_GGUF, train/gguf/v2, or ~/.config/condense/models."
   fi
   if "$INSTALLED_BIN" --help 2>/dev/null | grep -q "condense warmup"; then
     if "$INSTALLED_BIN" warmup; then

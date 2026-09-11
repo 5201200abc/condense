@@ -11,18 +11,23 @@ packages/condense-*/bin/
 # Pack archives
 *.tgz
 
-# Local training weights (keep only v2 Q4 on disk; never commit)
-training/models/
-training/adapters/
-training/gguf/
-training/**/*.gguf
-training/**/*.safetensors
+# Local training data and weights (never commit raw data or weights)
+train/raw/
+train/data/
+train/models/
+train/adapters/
+train/gguf/
+train/**/*.gguf
+train/**/*.safetensors
 
 # Logs and runtime artifacts
 logs/
 *.log
+**/*.log
 local-server.lock
 local-server.pid
+*.pid
+**/*.pid
 datasets/
 
 # Coverage and test artifacts

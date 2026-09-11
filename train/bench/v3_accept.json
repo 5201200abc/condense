@@ -1,0 +1,19 @@
+{
+  "train": false,
+  "goal": "reliability of safe-to-compress long logs",
+  "not_a_goal": "compression ratio",
+  "observe": ["long", "overflow", "suspect"],
+  "observe_file": "~/.config/condense/observe.jsonl",
+  "hard_cases": [
+    "mixed_pass_fail",
+    "empty_as_fail",
+    "terraform_destructive",
+    "missed_critical"
+  ],
+  "must_not_fail": [
+    "mixed PASS/FAIL logs cannot be summarized as PASS",
+    "empty or timed-out CI cannot be summarized as FAIL",
+    "terraform destroy/replace cannot be summarized as SAFE",
+    "critical FAIL/error lines in a long log cannot be dropped"
+  ]
+}

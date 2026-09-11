@@ -98,7 +98,7 @@ describe("local server backend selection", () => {
 
   it("copies packaged v2 Q4 GGUF into the config models dir", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "condense-gguf-stage-"));
-    const packaged = path.join(root, "pkg", "training/gguf/v2");
+    const packaged = path.join(root, "pkg", "train/gguf/v2");
     const configDir = path.join(root, "config");
 
     try {

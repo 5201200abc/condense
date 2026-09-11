@@ -1,0 +1,174 @@
+{
+  "results": [
+    {
+      "model": "v2-fused-mlx-compact",
+      "id": "3585be5f8f128af1",
+      "task": "pass_fail",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "FAIL",
+      "error": null,
+      "sec": 0.97,
+      "has_empty_think": true
+    },
+    {
+      "model": "v2-fused-mlx-compact",
+      "id": "7a31e993886f0244",
+      "task": "docker_k8s",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "condense: Insufficient information to output anything.",
+      "error": null,
+      "sec": 0.52,
+      "has_empty_think": true
+    },
+    {
+      "model": "v2-fused-mlx-compact",
+      "id": "5ff0797cf7719d27",
+      "task": "generic",
+      "gold": "9bea851 feat: harden local runtime and release packaging\ne203e7d fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 docs: align model source label in root README\naf464f8 fix(local-server): disable mlx pro",
+      "pred": "9bea851 HEAD@{0}: feat: harden local runtime and release packaging\ne203e7d HEAD@{1}: commit: fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 HEAD@{2}: commit: docs: align model source label in root README\naf464f8 HEAD@{3}: commit: fix(local-server): disable mlx prompt cache to prevent GPU memory leak and OOM hangs\nc9dcba5 HEAD@{4}: commit: chore: remove Homebrew installation and upgrade references\n41",
+      "error": null,
+      "sec": 2.19,
+      "has_empty_think": true
+    },
+    {
+      "model": "v2-fused-mlx-compact",
+      "id": "adf1d9de89eed42f",
+      "task": "typescript_check",
+      "gold": "FAIL ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68), ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18), ../../../../../../../var/",
+      "pred": "FAIL\n../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68): error TS2339: Property 'body' does not exist on type 'Req'.\n../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18): error TS2322",
+      "error": null,
+      "sec": 2.13,
+      "has_empty_think": true
+    },
+    {
+      "model": "v2-fused-mlx-compact",
+      "id": "1c5e716a62a26fed",
+      "task": "terraform_plan",
+      "gold": "UNSAFE\n  # local_file.db must be replaced\n-/+ resource \"local_file\" \"db\" {\n      ~ content              = \"prod-db\" -> \"prod-db-v2\" # forces replacement\n  # local_file.old_bucket will be destroyed\n  - resource \"local_file\" \"old_bucket\" {\n  ",
+      "pred": "SAFE",
+      "error": null,
+      "sec": 0.82,
+      "has_empty_think": true
+    },
+    {
+      "model": "v2-fused-mlx-compact",
+      "id": "c46c9d8a103c8e7d",
+      "task": "security_audit",
+      "gold": "[{\"package\":\"ejs\",\"range\":\"<3.1.7\",\"severity\":\"critical\",\"title\":\"ejs template injection vulnerability\",\"url\":\"https://github.com/advisories/GHSA-phwq-j96m-2c2q\"},{\"package\":\"ejs\",\"range\":\"<3.1.10\",\"severity\":\"moderate\",\"title\":\"ejs lacks c",
+      "pred": "[]",
+      "error": null,
+      "sec": 0.55,
+      "has_empty_think": true
+    },
+    {
+      "model": "v2-f16-gguf-chat",
+      "id": "3585be5f8f128af1",
+      "task": "pass_fail",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 2.24
+    },
+    {
+      "model": "v2-f16-gguf-chat",
+      "id": "7a31e993886f0244",
+      "task": "docker_k8s",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 2.04
+    },
+    {
+      "model": "v2-f16-gguf-chat",
+      "id": "5ff0797cf7719d27",
+      "task": "generic",
+      "gold": "9bea851 feat: harden local runtime and release packaging\ne203e7d fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 docs: align model source label in root README\naf464f8 fix(local-server): disable mlx pro",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 2.15
+    },
+    {
+      "model": "v2-f16-gguf-chat",
+      "id": "adf1d9de89eed42f",
+      "task": "typescript_check",
+      "gold": "FAIL ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68), ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18), ../../../../../../../var/",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 2.14
+    },
+    {
+      "model": "v2-f16-gguf-chat",
+      "id": "1c5e716a62a26fed",
+      "task": "terraform_plan",
+      "gold": "UNSAFE\n  # local_file.db must be replaced\n-/+ resource \"local_file\" \"db\" {\n      ~ content              = \"prod-db\" -> \"prod-db-v2\" # forces replacement\n  # local_file.old_bucket will be destroyed\n  - resource \"local_file\" \"old_bucket\" {\n  ",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 2.73
+    },
+    {
+      "model": "v2-f16-gguf-chat",
+      "id": "c46c9d8a103c8e7d",
+      "task": "security_audit",
+      "gold": "[{\"package\":\"ejs\",\"range\":\"<3.1.7\",\"severity\":\"critical\",\"title\":\"ejs template injection vulnerability\",\"url\":\"https://github.com/advisories/GHSA-phwq-j96m-2c2q\"},{\"package\":\"ejs\",\"range\":\"<3.1.10\",\"severity\":\"moderate\",\"title\":\"ejs lacks c",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 2.34
+    },
+    {
+      "model": "v2-q4-gguf-chat",
+      "id": "3585be5f8f128af1",
+      "task": "pass_fail",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 1.24
+    },
+    {
+      "model": "v2-q4-gguf-chat",
+      "id": "7a31e993886f0244",
+      "task": "docker_k8s",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 1.09
+    },
+    {
+      "model": "v2-q4-gguf-chat",
+      "id": "5ff0797cf7719d27",
+      "task": "generic",
+      "gold": "9bea851 feat: harden local runtime and release packaging\ne203e7d fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 docs: align model source label in root README\naf464f8 fix(local-server): disable mlx pro",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 1.23
+    },
+    {
+      "model": "v2-q4-gguf-chat",
+      "id": "adf1d9de89eed42f",
+      "task": "typescript_check",
+      "gold": "FAIL ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68), ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18), ../../../../../../../var/",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 1.26
+    },
+    {
+      "model": "v2-q4-gguf-chat",
+      "id": "1c5e716a62a26fed",
+      "task": "terraform_plan",
+      "gold": "UNSAFE\n  # local_file.db must be replaced\n-/+ resource \"local_file\" \"db\" {\n      ~ content              = \"prod-db\" -> \"prod-db-v2\" # forces replacement\n  # local_file.old_bucket will be destroyed\n  - resource \"local_file\" \"old_bucket\" {\n  ",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 1.8
+    },
+    {
+      "model": "v2-q4-gguf-chat",
+      "id": "c46c9d8a103c8e7d",
+      "task": "security_audit",
+      "gold": "[{\"package\":\"ejs\",\"range\":\"<3.1.7\",\"severity\":\"critical\",\"title\":\"ejs template injection vulnerability\",\"url\":\"https://github.com/advisories/GHSA-phwq-j96m-2c2q\"},{\"package\":\"ejs\",\"range\":\"<3.1.10\",\"severity\":\"moderate\",\"title\":\"ejs lacks c",
+      "pred": "",
+      "error": "HTTP 500: {\"error\":{\"code\":500,\"message\":\"The model produced output that does not match the expected peg-native format\",\"type\":\"server_error\"}}",
+      "sec": 1.46
+    }
+  ],
+  "rendered_tail": "al\": 0,\n      \"total\": 1\n    }\n  }\n}\n\nexit 1\n\nQuestion: Extract the vulnerabilities. Return valid JSON only.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "system_chars": 1181
+}

@@ -1,0 +1,190 @@
+{
+  "results": [
+    {
+      "model": "distill2-0.6B",
+      "id": "3585be5f8f128af1",
+      "task": "pass_fail",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "<think>\n\n</think>\n\nFAIL command failed: gh: Command '['gh', 'run', 'view', '34073961416', '-R', 'hashicorp/vault']' timed out after 30 seconds",
+      "sec": 1.01
+    },
+    {
+      "model": "distill2-0.6B",
+      "id": "7a31e993886f0244",
+      "task": "docker_k8s",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "<think>\n\n</think>\n\nerror: the path \"/var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-k8s-mptgzgp9/missing.yaml\" does not exist\n\nexit 1",
+      "sec": 0.88
+    },
+    {
+      "model": "distill2-0.6B",
+      "id": "5ff0797cf7719d27",
+      "task": "generic",
+      "gold": "9bea851 feat: harden local runtime and release packaging\ne203e7d fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 docs: align model source label in root README\naf464f8 fix(local-server): disable mlx pro",
+      "pred": "<think>\n\n</think>\n\n9bea851\ne203e7d\n04955d6\naf464f8\nc9dcba5\nd32239c\nd93c5cb\nexit",
+      "sec": 1.03
+    },
+    {
+      "model": "distill2-0.6B",
+      "id": "adf1d9de89eed42f",
+      "task": "typescript_check",
+      "gold": "FAIL ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68), ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18), ../../../../../../../var/",
+      "pred": "<think>\n\n</think>\n\nFAIL error TS2339: Property 'body' does not exist on type 'Req'.\nFAIL error TS2322: Type 'number' is not assignable to type 'string'.\nFAIL error TS2322: Type '\"PUT\"' is not assignable to type '\"GET\" | \"POST\"'.\nFAIL error ",
+      "sec": 1.14
+    },
+    {
+      "model": "distill2-0.6B",
+      "id": "1c5e716a62a26fed",
+      "task": "terraform_plan",
+      "gold": "UNSAFE\n  # local_file.db must be replaced\n-/+ resource \"local_file\" \"db\" {\n      ~ content              = \"prod-db\" -> \"prod-db-v2\" # forces replacement\n  # local_file.old_bucket will be destroyed\n  - resource \"local_file\" \"old_bucket\" {\n  ",
+      "pred": "<think>\n\n</think>\n\nUNSAFE Terraform will perform the following actions: destroy and then create replacement; null_resource.web must be replaced; local_file.old_bucket will be destroyed.",
+      "sec": 1.37
+    },
+    {
+      "model": "distill2-0.6B",
+      "id": "c46c9d8a103c8e7d",
+      "task": "security_audit",
+      "gold": "[{\"package\":\"ejs\",\"range\":\"<3.1.7\",\"severity\":\"critical\",\"title\":\"ejs template injection vulnerability\",\"url\":\"https://github.com/advisories/GHSA-phwq-j96m-2c2q\"},{\"package\":\"ejs\",\"range\":\"<3.1.10\",\"severity\":\"moderate\",\"title\":\"ejs lacks c",
+      "pred": "<think>\n\n</think>\n\n[{\"name\": \"ejs\", \"severity\": \"critical\", \"isDirect\": true, \"via\": [{\"source\": 1089270, \"name\": \"ejs\", \"dependency\": \"ejs\", \"title\": \"ejs template injection vulnerability\", \"url\": \"https://github.com/advisories/GHSA-phwq-j",
+      "sec": 1.34
+    },
+    {
+      "model": "official-0.8B-fused",
+      "id": "3585be5f8f128af1",
+      "task": "pass_fail",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "Okay, let me look at the command output. The user is asking about CI passing, and the output shows \"gh: Command '['gh', 'run', 'view', '34073961416', '-R', 'hashicorp/vault']' timed out after 30 seconds\". So, when I check the output, it doe",
+      "sec": 2.25
+    },
+    {
+      "model": "official-0.8B-fused",
+      "id": "7a31e993886f0244",
+      "task": "docker_k8s",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "First, the user asks: \"List resources that are not Ready or Running. One per line.\" This is a command output, so I need to output only the requested format.\n\nLooking at the history, the latest input is: \"Question: List resources that are no",
+      "sec": 2.01
+    },
+    {
+      "model": "official-0.8B-fused",
+      "id": "5ff0797cf7719d27",
+      "task": "generic",
+      "gold": "9bea851 feat: harden local runtime and release packaging\ne203e7d fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 docs: align model source label in root README\naf464f8 fix(local-server): disable mlx pro",
+      "pred": "First, the user asks: \"List the recent commits. Return only hash and subject, one per line.\"\n\nNow, looking at the history, this is a new input. The recent commits are already defined in the history, so I need to output that.\n\nFrom the histo",
+      "sec": 2.15
+    },
+    {
+      "model": "official-0.8B-fused",
+      "id": "adf1d9de89eed42f",
+      "task": "typescript_check",
+      "gold": "FAIL ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68), ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18), ../../../../../../../var/",
+      "pred": "First, the user asks: \"Did the build succeed? Return PASS or FAIL, listing exact error files and line numbers.\"\n\nLooking back at the history, this is the latest input. The previous output was: \"exit 1\" which was the command output, and then",
+      "sec": 2.05
+    },
+    {
+      "model": "official-0.8B-fused",
+      "id": "1c5e716a62a26fed",
+      "task": "terraform_plan",
+      "gold": "UNSAFE\n  # local_file.db must be replaced\n-/+ resource \"local_file\" \"db\" {\n      ~ content              = \"prod-db\" -> \"prod-db-v2\" # forces replacement\n  # local_file.old_bucket will be destroyed\n  - resource \"local_file\" \"old_bucket\" {\n  ",
+      "pred": "First, the user asks: \"Is this safe? Return PASS or FAIL, failing test names if any.\" Looking back at the history, this is the first question, so I need to output PASS or FAIL first.\n\nNow, the source is: \"Is this safe? Return PASS or FAIL, ",
+      "sec": 2.59
+    },
+    {
+      "model": "official-0.8B-fused",
+      "id": "c46c9d8a103c8e7d",
+      "task": "security_audit",
+      "gold": "[{\"package\":\"ejs\",\"range\":\"<3.1.7\",\"severity\":\"critical\",\"title\":\"ejs template injection vulnerability\",\"url\":\"https://github.com/advisories/GHSA-phwq-j96m-2c2q\"},{\"package\":\"ejs\",\"range\":\"<3.1.10\",\"severity\":\"moderate\",\"title\":\"ejs lacks c",
+      "pred": "</think>\n\n[{\"package\":\"ejs\",\"version\":\"6.0.1\",\"cve\":\"CVE-2021-23337\",\"severity\":\"high\"},{\"package\":\"minimist\",\"version\":\"<0.2.1\",\"cve\":\"CVE-2020-7598\",\"severity\":\"low\"}]<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n",
+      "sec": 2.23
+    },
+    {
+      "model": "official-0.8B-fused-nothink",
+      "id": "3585be5f8f128af1",
+      "task": "pass_fail",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "FAIL gh: Command '['gh', 'run', 'view', '34073961416', '-R', 'hashicorp/vault']' timed out after 30 seconds<|im_end|>\n! gh run view 34073961416 --timeout 30s gh: Command '['gh', 'run', 'view', '34073961416', '-R',"
+    },
+    {
+      "model": "official-0.8B-fused-nothink",
+      "id": "7a31e993886f0244",
+      "task": "docker_k8s",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "FAIL worker-xy CrashLoopBackOff, job-zz Error<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|i"
+    },
+    {
+      "model": "official-0.8B-fused-nothink",
+      "id": "5ff0797cf7719d27",
+      "task": "generic",
+      "gold": "9bea851 feat: harden local runtime and release packaging\ne203e7d fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 docs: align model source label in root README\naf464f8 fix(local-server): disable mlx pro",
+      "pred": "<think>\n\n</think>\n\ncondense: Insufficient information to output anything.\n</think>\n\n<think>\n\n</think>\n\nFAIL src/auth.test.ts\n  expected 5, got 3\n1 passed, 1 failed.\nA:\nFAIL src/queue.test.ts\n  expected 5, got 3\n1 passed, 1 failed.\nA:\nFAIL s"
+    },
+    {
+      "model": "official-0.8B-fused-nothink",
+      "id": "adf1d9de89eed42f",
+      "task": "typescript_check",
+      "gold": "FAIL ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68), ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18), ../../../../../../../var/",
+      "pred": "FAIL src/auth.test.ts\n  expected 5, got 3\n1 passed, 1 failed.<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n"
+    },
+    {
+      "model": "official-0.8B-fused-nothink",
+      "id": "1c5e716a62a26fed",
+      "task": "terraform_plan",
+      "gold": "UNSAFE\n  # local_file.db must be replaced\n-/+ resource \"local_file\" \"db\" {\n      ~ content              = \"prod-db\" -> \"prod-db-v2\" # forces replacement\n  # local_file.old_bucket will be destroyed\n  - resource \"local_file\" \"old_bucket\" {\n  ",
+      "pred": "UNSAFE - null_resource.web triggers AWS instance refresh and local_file.old_bucket triggers local_file refresh, both with destructive operations.<|im_end|>\n!{\n  \"package\":\"null_resource\",\"version\":\"<0.1.0\",\"cve\":\"CVE-2020-7598 Low\",\"severit"
+    },
+    {
+      "model": "official-0.8B-fused-nothink",
+      "id": "c46c9d8a103c8e7d",
+      "task": "security_audit",
+      "gold": "[{\"package\":\"ejs\",\"range\":\"<3.1.7\",\"severity\":\"critical\",\"title\":\"ejs template injection vulnerability\",\"url\":\"https://github.com/advisories/GHSA-phwq-j96m-2c2q\"},{\"package\":\"ejs\",\"range\":\"<3.1.10\",\"severity\":\"moderate\",\"title\":\"ejs lacks c",
+      "pred": "[{\"package\":\"ejs\",\"version\":\"6.0.1\",\"cve\":\"CVE-2021-23337\",\"severity\":\"high\"},{\"package\":\"minimist\",\"version\":\"<0.2.1\",\"cve\":\"CVE-2020-7598\",\"severity\":\"low\"}]<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|>\n!<|im_end|"
+    },
+    {
+      "model": "v2-0.8B-fused-nothink",
+      "id": "3585be5f8f128af1",
+      "task": "pass_fail",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "FAIL src/auth.test.ts",
+      "sec": 0.88
+    },
+    {
+      "model": "v2-0.8B-fused-nothink",
+      "id": "7a31e993886f0244",
+      "task": "docker_k8s",
+      "gold": "condense: Insufficient information to output anything.",
+      "pred": "FAIL worker-xy CrashLoopBackOff, job-zz Error",
+      "sec": 1.0
+    },
+    {
+      "model": "v2-0.8B-fused-nothink",
+      "id": "5ff0797cf7719d27",
+      "task": "generic",
+      "gold": "9bea851 feat: harden local runtime and release packaging\ne203e7d fix(stats): maintain per-project recent command history and isolate test stats\n04955d6 docs: align model source label in root README\naf464f8 fix(local-server): disable mlx pro",
+      "pred": "total 12\n-rw-r--r-- 1 user staff 120 Jan 1\n-rw-r--r-- 1 user staff 42 Jan 1\n-rw-r--r-- 1 user staff 42 Jan 1\n-rw-r--r-- 1 user staff 42 Jan 1\n-rw-r--r-- 1 user staff 42 Jan 1\n-rw-r--r-- 1 user staff 42 Jan 1\n-rw-r--r-- 1 user staff 42 Jan 1\n-rw-r",
+      "sec": 2.7
+    },
+    {
+      "model": "v2-0.8B-fused-nothink",
+      "id": "adf1d9de89eed42f",
+      "task": "typescript_check",
+      "gold": "FAIL ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(2,68), ../../../../../../../var/folders/h7/0ccrtkj16b9dyck664df70180000gn/T/condense-vol-qdd3dlkj/web.ts(3,18), ../../../../../../../var/",
+      "pred": "FAIL src/auth.test.ts\n  1 passed, 1 failed.",
+      "sec": 1.17
+    },
+    {
+      "model": "v2-0.8B-fused-nothink",
+      "id": "1c5e716a62a26fed",
+      "task": "terraform_plan",
+      "gold": "UNSAFE\n  # local_file.db must be replaced\n-/+ resource \"local_file\" \"db\" {\n      ~ content              = \"prod-db\" -> \"prod-db-v2\" # forces replacement\n  # local_file.old_bucket will be destroyed\n  - resource \"local_file\" \"old_bucket\" {\n  ",
+      "pred": "UNSAFE",
+      "sec": 1.35
+    },
+    {
+      "model": "v2-0.8B-fused-nothink",
+      "id": "c46c9d8a103c8e7d",
+      "task": "security_audit",
+      "gold": "[{\"package\":\"ejs\",\"range\":\"<3.1.7\",\"severity\":\"critical\",\"title\":\"ejs template injection vulnerability\",\"url\":\"https://github.com/advisories/GHSA-phwq-j96m-2c2q\"},{\"package\":\"ejs\",\"range\":\"<3.1.10\",\"severity\":\"moderate\",\"title\":\"ejs lacks c",
+      "pred": "[]",
+      "sec": 0.97
+    }
+  ]
+}

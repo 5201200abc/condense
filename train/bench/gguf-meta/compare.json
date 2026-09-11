@@ -1,0 +1,328 @@
+{
+  "old_f16": {
+    "path": "train/gguf/v2/condense-0.8B-f16.gguf",
+    "n_kv": 41,
+    "n_tensors": 320,
+    "arch": "qwen35",
+    "block_count": 24,
+    "full_attention_interval": 4,
+    "recurrent_layers": [
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "ssm": {
+      "qwen35.ssm.conv_kernel": 4,
+      "qwen35.ssm.state_size": 128,
+      "qwen35.ssm.group_count": 16,
+      "qwen35.ssm.time_step_rank": 16,
+      "qwen35.ssm.inner_size": 2048
+    },
+    "rope_dim": 64,
+    "rope_sections": [
+      11,
+      11,
+      10,
+      0
+    ],
+    "tokenizer": "gpt2",
+    "has_chat_template": true,
+    "chat_template_len": 7755,
+    "enable_thinking_in_template": true,
+    "norm_means": {
+      "blk.0.attn_norm.weight": 2.2384,
+      "blk.0.attn_norm.weight_shape": [
+        1024
+      ],
+      "blk.0.ssm_norm.weight": 0.9518,
+      "blk.0.ssm_norm.weight_shape": [
+        128
+      ],
+      "blk.0.post_attention_norm.weight": 2.0856,
+      "blk.0.post_attention_norm.weight_shape": [
+        1024
+      ],
+      "output_norm.weight": 5.3084,
+      "output_norm.weight_shape": [
+        1024
+      ]
+    }
+  },
+  "plus1": {
+    "path": "train/gguf/v2-reconvert/f16-latest-plus1.gguf",
+    "n_kv": 41,
+    "n_tensors": 320,
+    "arch": "qwen35",
+    "block_count": 24,
+    "full_attention_interval": 4,
+    "recurrent_layers": [
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "ssm": {
+      "qwen35.ssm.conv_kernel": 4,
+      "qwen35.ssm.state_size": 128,
+      "qwen35.ssm.group_count": 16,
+      "qwen35.ssm.time_step_rank": 16,
+      "qwen35.ssm.inner_size": 2048
+    },
+    "rope_dim": 64,
+    "rope_sections": [
+      11,
+      11,
+      10,
+      0
+    ],
+    "tokenizer": "gpt2",
+    "has_chat_template": true,
+    "chat_template_len": 7755,
+    "enable_thinking_in_template": true,
+    "norm_means": {
+      "blk.0.attn_norm.weight": 2.2384,
+      "blk.0.attn_norm.weight_shape": [
+        1024
+      ],
+      "blk.0.ssm_norm.weight": 0.9518,
+      "blk.0.ssm_norm.weight_shape": [
+        128
+      ],
+      "blk.0.post_attention_norm.weight": 2.0856,
+      "blk.0.post_attention_norm.weight_shape": [
+        1024
+      ],
+      "output_norm.weight": 5.3084,
+      "output_norm.weight_shape": [
+        1024
+      ]
+    }
+  },
+  "nop1": {
+    "path": "train/gguf/v2-reconvert/f16-latest-nop1.gguf",
+    "n_kv": 41,
+    "n_tensors": 320,
+    "arch": "qwen35",
+    "block_count": 24,
+    "full_attention_interval": 4,
+    "recurrent_layers": [
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false
+    ],
+    "ssm": {
+      "qwen35.ssm.conv_kernel": 4,
+      "qwen35.ssm.state_size": 128,
+      "qwen35.ssm.group_count": 16,
+      "qwen35.ssm.time_step_rank": 16,
+      "qwen35.ssm.inner_size": 2048
+    },
+    "rope_dim": 64,
+    "rope_sections": [
+      11,
+      11,
+      10,
+      0
+    ],
+    "tokenizer": "gpt2",
+    "has_chat_template": true,
+    "chat_template_len": 7755,
+    "enable_thinking_in_template": true,
+    "norm_means": {
+      "blk.0.attn_norm.weight": 1.2384,
+      "blk.0.attn_norm.weight_shape": [
+        1024
+      ],
+      "blk.0.ssm_norm.weight": 0.9518,
+      "blk.0.ssm_norm.weight_shape": [
+        128
+      ],
+      "blk.0.post_attention_norm.weight": 1.0856,
+      "blk.0.post_attention_norm.weight_shape": [
+        1024
+      ],
+      "output_norm.weight": 4.3084,
+      "output_norm.weight_shape": [
+        1024
+      ]
+    }
+  },
+  "nop1_mtp": {
+    "path": "train/gguf/v2-reconvert/f16-latest-nop1-mtp.gguf",
+    "n_kv": 42,
+    "n_tensors": 320,
+    "arch": "qwen35",
+    "block_count": 25,
+    "full_attention_interval": 4,
+    "recurrent_layers": [
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ],
+    "ssm": {
+      "qwen35.ssm.conv_kernel": 4,
+      "qwen35.ssm.state_size": 128,
+      "qwen35.ssm.group_count": 16,
+      "qwen35.ssm.time_step_rank": 16,
+      "qwen35.ssm.inner_size": 2048
+    },
+    "rope_dim": 64,
+    "rope_sections": [
+      11,
+      11,
+      10,
+      0
+    ],
+    "tokenizer": "gpt2",
+    "has_chat_template": true,
+    "chat_template_len": 7755,
+    "enable_thinking_in_template": true,
+    "norm_means": {
+      "blk.0.attn_norm.weight": 1.2384,
+      "blk.0.attn_norm.weight_shape": [
+        1024
+      ],
+      "blk.0.ssm_norm.weight": 0.9518,
+      "blk.0.ssm_norm.weight_shape": [
+        128
+      ],
+      "blk.0.post_attention_norm.weight": 1.0856,
+      "blk.0.post_attention_norm.weight_shape": [
+        1024
+      ],
+      "output_norm.weight": 4.3084,
+      "output_norm.weight_shape": [
+        1024
+      ]
+    }
+  },
+  "unsloth": {
+    "path": "train/gguf/unsloth/Qwen3.5-0.8B-Q4_K_M.gguf",
+    "n_kv": 49,
+    "n_tensors": 320,
+    "arch": "qwen35",
+    "block_count": 24,
+    "full_attention_interval": 4,
+    "recurrent_layers": null,
+    "ssm": {
+      "qwen35.ssm.conv_kernel": 4,
+      "qwen35.ssm.state_size": 128,
+      "qwen35.ssm.group_count": 16,
+      "qwen35.ssm.time_step_rank": 16,
+      "qwen35.ssm.inner_size": 2048
+    },
+    "rope_dim": 64,
+    "rope_sections": [
+      11,
+      11,
+      10,
+      0
+    ],
+    "tokenizer": "gpt2",
+    "has_chat_template": true,
+    "chat_template_len": 7816,
+    "enable_thinking_in_template": true,
+    "norm_means": {
+      "output_norm.weight": 4.3092,
+      "output_norm.weight_shape": [
+        1024
+      ],
+      "blk.0.attn_norm.weight": 1.2376,
+      "blk.0.attn_norm.weight_shape": [
+        1024
+      ],
+      "blk.0.post_attention_norm.weight": 1.0853,
+      "blk.0.post_attention_norm.weight_shape": [
+        1024
+      ],
+      "blk.0.ssm_norm.weight": 0.9516,
+      "blk.0.ssm_norm.weight_shape": [
+        128
+      ]
+    }
+  }
+}

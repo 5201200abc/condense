@@ -22,6 +22,7 @@ import {
   summarizeWatch
 } from "./llm";
 import { runOnboarding, warmupLocalModel } from "./onboarding";
+import { runRecallCommand } from "./recall";
 import { runStatsCommand } from "./stats";
 import { CondenseSession, type ProgressPhase } from "./stream-condenser";
 import { resolveDatasetPath } from "./dataset";
@@ -151,6 +152,14 @@ async function run(): Promise<number> {
     return 0;
   }
 
+  if (command.kind === "recall") {
+    return runRecallCommand(command.args, {
+      env: process.env,
+      stdout: process.stdout,
+      stderr: process.stderr
+    });
+  }
+
   if (command.kind === "configShow") {
     process.stdout.write(
       [
@@ -235,6 +244,8 @@ async function run(): Promise<number> {
         summarizeWatch(command.config, previous, current)
     },
     runtimeConfig: command.config,
+    cwd: process.cwd(),
+    applySkipPolicy: true,
     dataset: {
       enabled: command.config.datasetEnabled,
       path: resolveDatasetPath(process.env, command.config.datasetPath)

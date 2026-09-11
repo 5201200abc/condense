@@ -96,6 +96,13 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function longLog(extra: string): string {
+  const head = Array.from({ length: 120 }, (_, index) => `PASS test/ok${index}.test.ts`).join(
+    "\n"
+  );
+  return `${head}\n${extra}`;
+}
+
 function resolveUnixShell(): string {
   const candidates = [process.env.SHELL, "zsh", "bash", "sh"].filter(
     (value): value is string => Boolean(value)
@@ -275,7 +282,7 @@ describe("condense end-to-end", () => {
     try {
       const result = await runLauncher(["did the tests pass?"], {
         env: createProviderEnv(fake.host),
-        inputSteps: [{ data: "Ran 12 tests\n12 passed\n" }]
+        inputSteps: [{ data: longLog("Ran 12 tests\n12 passed\n") }]
       });
 
       expect(result.code).toBe(0);
@@ -285,6 +292,30 @@ describe("condense end-to-end", () => {
       expect(fake.requests[0]).toMatchObject({
         model: DEFAULT_MODEL
       });
+    } finally {
+      fake.stop();
+    }
+  });
+
+  it("bypasses short commands without calling the provider", async () => {
+    const fake = await createFakeChatProvider((_body, _index) =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "should not happen" } }]
+        }),
+        { status: 200 }
+      )
+    );
+
+    try {
+      const result = await runLauncher(["which files are shown?"], {
+        env: createProviderEnv(fake.host),
+        inputSteps: [{ data: "ls\nfile.txt\n" }]
+      });
+
+      expect(result.code).toBe(0);
+      expect(result.stdout).toBe("ls\nfile.txt\n");
+      expect(fake.requests).toHaveLength(0);
     } finally {
       fake.stop();
     }
@@ -316,18 +347,18 @@ describe("condense end-to-end", () => {
     try {
       const first = await runLauncher(["summarize"], {
         env: createProviderEnv(fake.host, env),
-        inputSteps: [{ data: "auth failed once\n" }]
+        inputSteps: [{ data: longLog("auth failed once\n") }]
       });
       const second = await runLauncher(["summarize"], {
         env: createProviderEnv(fake.host, env),
-        inputSteps: [{ data: "auth failed twice\n" }]
+        inputSteps: [{ data: longLog("auth failed twice\n") }]
       });
       const shown = await runLauncher(["dsl", "show", "--scope", "project"], {
         env
       });
       const third = await runLauncher(["summarize"], {
         env: createProviderEnv(fake.host, env),
-        inputSteps: [{ data: "auth failed later\n" }]
+        inputSteps: [{ data: longLog("auth failed later\n") }]
       });
       const thirdPrompt = JSON.stringify(fake.requests[2]);
 
@@ -396,7 +427,7 @@ describe("condense end-to-end", () => {
       });
       const summary = await runLauncher(["summarize"], {
         env: createProviderEnv(fake.host, env),
-        inputSteps: [{ data: "cache model later\n" }]
+        inputSteps: [{ data: longLog("cache model later\n") }]
       });
 
       expect(learned.stdout).toContain("active #c1 added to project");
@@ -542,7 +573,7 @@ describe("condense end-to-end", () => {
     const dir = await mkdtemp(path.join(tmpdir(), "condense-e2e-pty-"));
     const capturePath = path.join(dir, "terminal.log");
     const shellCommand =
-      "perl -e '$|=1; for (1..8) { print qq(Ran chunk $_\\n); select undef,undef,undef,0.18; }' | " +
+      "perl -e '$|=1; for (1..120) { print qq(PASS test/ok$_.test.ts\\n); } select undef,undef,undef,0.5;' | " +
       `node ${launcher} 'did the tests pass?'`;
     const scriptCommand = createScriptCommand(capturePath, resolveUnixShell(), [
       "-lc",
@@ -705,7 +736,7 @@ describe("condense end-to-end", () => {
       const summary = await runProcess(installedBinary, ["did the tests pass?"], {
         cwd: installDir,
         env: createProviderEnv(fake.host),
-        inputSteps: [{ data: "12 passed\n" }]
+        inputSteps: [{ data: longLog("12 passed\n") }]
       });
 
       expect(summary.code).toBe(0);
@@ -743,7 +774,7 @@ describe("condense end-to-end", () => {
           CONDENSE_CONFIG_PATH: configPath,
           CONDENSE_HOST: fake.host
         },
-        inputSteps: [{ data: "all good\n" }]
+        inputSteps: [{ data: longLog("all good\n") }]
       });
 
       expect(setModel.stdout).toBe("model=my-model\n");

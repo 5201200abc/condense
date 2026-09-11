@@ -86,6 +86,7 @@ function isSummarizeInvocation(argv) {
     "dsl",
     "stats",
     "savings",
+    "recall",
     "upgrade",
     "update",
     "translate",

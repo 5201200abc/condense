@@ -66,7 +66,7 @@ export function llamaGgufCandidates(
 
   return [
     explicit,
-    path.join(packageRoot, "training/gguf/v2", CONDENSE_LLAMA_GGUF_FILENAME),
+    path.join(packageRoot, "train/gguf/v2", CONDENSE_LLAMA_GGUF_FILENAME),
     path.join(configDir, "models", CONDENSE_LLAMA_GGUF_FILENAME)
   ].filter((candidate): candidate is string => Boolean(candidate));
 }
@@ -110,7 +110,7 @@ export async function stagePackagedGguf(
 
   const packageRoot =
     env.CONDENSE_PACKAGE_ROOT?.trim() || path.resolve(import.meta.dir, "..");
-  const src = path.join(packageRoot, "training/gguf/v2", CONDENSE_LLAMA_GGUF_FILENAME);
+  const src = path.join(packageRoot, "train/gguf/v2", CONDENSE_LLAMA_GGUF_FILENAME);
 
   if (!existsSync(src) || path.resolve(src) === path.resolve(dest)) {
     return existsSync(src) ? path.resolve(src) : null;
@@ -263,7 +263,7 @@ export async function ensureLocalServer(
 
       if (!existsSync(llamaGgufPath)) {
         throw new Error(
-          `Missing local GGUF at ${llamaGgufPath}. Place ${CONDENSE_LLAMA_GGUF_FILENAME} at training/gguf/v2 or ~/.config/condense/models, or set CONDENSE_LLAMA_GGUF.`
+          `Missing local GGUF at ${llamaGgufPath}. Place ${CONDENSE_LLAMA_GGUF_FILENAME} at train/gguf/v2 or ~/.config/condense/models, or set CONDENSE_LLAMA_GGUF.`
         );
       }
     }

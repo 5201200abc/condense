@@ -36,10 +36,14 @@ function createDelayedSummarizer(delayMs: number, response: string) {
 describe("CondenseSession", () => {
   let testStatsDir = "";
   const originalStatsPath = process.env.CONDENSE_STATS_PATH;
+  const originalObservePath = process.env.CONDENSE_OBSERVE_PATH;
+  const originalRecallPath = process.env.CONDENSE_RECALL_PATH;
 
   beforeAll(async () => {
     testStatsDir = await mkdtemp(path.join(tmpdir(), "condense-test-stats-"));
     process.env.CONDENSE_STATS_PATH = path.join(testStatsDir, "stats.json");
+    process.env.CONDENSE_OBSERVE_PATH = path.join(testStatsDir, "observe.jsonl");
+    process.env.CONDENSE_RECALL_PATH = path.join(testStatsDir, "recall.db");
   });
 
   afterAll(async () => {
@@ -47,6 +51,16 @@ describe("CondenseSession", () => {
       process.env.CONDENSE_STATS_PATH = originalStatsPath;
     } else {
       delete process.env.CONDENSE_STATS_PATH;
+    }
+    if (originalObservePath !== undefined) {
+      process.env.CONDENSE_OBSERVE_PATH = originalObservePath;
+    } else {
+      delete process.env.CONDENSE_OBSERVE_PATH;
+    }
+    if (originalRecallPath !== undefined) {
+      process.env.CONDENSE_RECALL_PATH = originalRecallPath;
+    } else {
+      delete process.env.CONDENSE_RECALL_PATH;
     }
     if (testStatsDir) {
       await rm(testStatsDir, { recursive: true, force: true });

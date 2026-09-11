@@ -307,33 +307,22 @@ condense stats --project
 
 ## Tool Calls
 
-CRITICAL: Every non-interactive, non-TUI shell/tool command must pipe output through `condense` with an explicit prompt. Do not run plain shell commands when summarized output is enough.
+Pipe only high-volume, low-density logs through `condense`: test runners, compilers, terraform, and similar. The prompt must say exactly what to return.
 
-CRITICAL: Skip `| condense` only when exact raw output is required or when `condense` would break an interactive/TUI workflow.
+Skip `| condense` for:
 
-CRITICAL: Your prompt to `condense` must be fully explicit. State exactly what you want to know and exactly what the output must contain. If you want only filenames, say `Return only the filenames.` If you want JSON, say `Return valid JSON only.` Do not ask vague questions.
-
-Bad:
-
-- `condense "Which files are shown?"`
-
-Good:
-
-- `condense "Which files are shown? Return only the filenames."`
+- Short commands (`ls`, `cat`, `pwd`, `rg` hits that already fit)
+- Interactive or TUI workflows
+- Source files, git diffs, and whole-repo or architecture dumps
+- Any case where a wrong summary (fail reported as PASS) would be worse than the raw log
 
 Examples:
 
 - `bun test 2>&1 | condense "Did the tests pass? Return only: PASS or FAIL, followed by failing test names if any."`
-- `git diff 2>&1 | condense "What changed? Return only the files changed and a one-line summary for each file."`
+- `npx tsc --noEmit 2>&1 | condense "Did the build succeed? Return FAIL and exact file:line errors."`
 - `terraform plan 2>&1 | condense "Is this safe? Return only: SAFE, REVIEW, or UNSAFE, followed by the exact risky changes."`
-- `npm audit 2>&1 | condense "Extract the vulnerabilities. Return valid JSON only."`
-- `rg -n "TODO|FIXME" . 2>&1 | condense "List files containing TODO or FIXME. Return only file paths, one per line."`
-- `ls -la 2>&1 | condense "Which files are shown? Return only the filenames."`
 
-You may skip `condense` only in these cases:
-
-- Exact uncompressed output is required.
-- Using `condense` would break an interactive or TUI workflow.
+Do not pipe `git diff`, file reads, or concatenated repositories through `condense`.
 
 CRITICAL: Wait for `condense` to finish before continuing.
 

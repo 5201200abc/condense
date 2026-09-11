@@ -17,8 +17,16 @@ import {
   normalizeForModel,
   structuralSimilarity
 } from "./text";
+import { randomUUID } from "node:crypto";
 import type { CompletionTimings } from "./llm";
 import {
+  appendObserveRecord,
+  buildObserveRecord
+} from "./observe";
+import { condenseSkipReason, countLines, type CondenseSkipReason } from "./policy";
+import { recordRecallSnapshot } from "./recall";
+import {
+  estimateTokens,
   formatSingleRunSummary,
   recordCondenseRun,
   type SingleRunStat
@@ -66,10 +74,14 @@ export interface CondenseSessionOptions {
   interactiveGapMs?: number;
   progressFrameMs?: number;
   env?: NodeJS.ProcessEnv;
+  cwd?: string;
+  applySkipPolicy?: boolean;
 }
 
 export class CondenseSession {
   private readonly env: NodeJS.ProcessEnv;
+  private readonly cwd: string;
+  private readonly applySkipPolicy: boolean;
   private readonly summarizer: Summarizer;
   private readonly runtimeConfig: RuntimeConfig | null;
   private readonly dataset: DatasetAppendConfig | null;
@@ -104,6 +116,8 @@ export class CondenseSession {
 
   constructor(options: CondenseSessionOptions) {
     this.env = options.env ?? process.env;
+    this.cwd = options.cwd ?? process.cwd();
+    this.applySkipPolicy = options.applySkipPolicy ?? false;
     this.summarizer = options.summarizer;
     this.runtimeConfig = options.runtimeConfig ?? null;
     this.dataset = options.dataset ?? null;
@@ -167,11 +181,22 @@ export class CondenseSession {
       return;
     }
 
+    if (this.applySkipPolicy) {
+      const skip = condenseSkipReason(rawInput, this.runtimeConfig?.question);
+      if (skip) {
+        this.stopProgress(true);
+        this.stdout.write(Buffer.concat(this.rawBuffers));
+        await this.captureStatsRecord(rawInput, rawInput, 0, undefined, skip);
+        return;
+      }
+    }
+
+    const requestId = randomUUID().replace(/-/g, "").slice(0, 16);
     const normalizedInput = normalizeForModel(rawInput);
+    const summarizeStartedAt = Date.now();
 
     try {
       this.setProgressPhase("summarizing");
-      const summarizeStartedAt = Date.now();
       const batchResult = await this.summarizer.summarizeBatch(normalizedInput);
       const durationMs = Date.now() - summarizeStartedAt;
       const summary =
@@ -182,6 +207,7 @@ export class CondenseSession {
       if (looksLikeBadDistillation(normalizedInput, summary)) {
         this.stopProgress(true);
         this.stdout.write(Buffer.concat(this.rawBuffers));
+        await this.captureStatsRecord(rawInput, rawInput, durationMs, timings);
         return;
       }
 
@@ -190,18 +216,95 @@ export class CondenseSession {
       this.stdout.write(ensureTrailingNewline(output));
       await this.captureDatasetRecord(normalizedInput, output);
       await this.captureDslLearning(output);
-      await this.captureStatsRecord(rawInput, output, durationMs, timings);
+      await this.captureRecallRecord(requestId, rawInput, output);
+      const suspect = await this.captureObserveRecord(
+        requestId,
+        rawInput,
+        normalizedInput,
+        output
+      );
+      await this.captureStatsRecord(
+        rawInput,
+        output,
+        durationMs,
+        timings,
+        undefined,
+        suspect
+      );
     } catch {
       this.stopProgress(true);
       this.stdout.write(Buffer.concat(this.rawBuffers));
+      await this.captureStatsRecord(
+        rawInput,
+        rawInput,
+        Date.now() - summarizeStartedAt
+      );
     }
+  }
+
+  private async captureRecallRecord(
+    requestId: string,
+    rawInput: string,
+    output: string
+  ): Promise<void> {
+    if (!this.runtimeConfig) {
+      return;
+    }
+    try {
+      await recordRecallSnapshot(this.env, {
+        requestId,
+        projectPath: this.cwd,
+        question: this.runtimeConfig.question,
+        rawInput,
+        output,
+        rawChars: rawInput.length,
+        rawBytes: Buffer.byteLength(rawInput, "utf8"),
+        outputChars: output.length,
+        rawEstimatedTokens: estimateTokens(rawInput),
+        outputEstimatedTokens: estimateTokens(output)
+      });
+    } catch {
+      this.stderr?.write("condense: failed to write recall snapshot.\n");
+    }
+  }
+
+  private async captureObserveRecord(
+    requestId: string,
+    rawInput: string,
+    modelInput: string,
+    output: string
+  ): Promise<string[] | undefined> {
+    if (!this.runtimeConfig || output === rawInput) {
+      return undefined;
+    }
+
+    const record = buildObserveRecord({
+      requestId,
+      question: this.runtimeConfig.question,
+      rawInput,
+      modelInput,
+      output,
+      inputLines: countLines(rawInput)
+    });
+    if (!record) {
+      return undefined;
+    }
+
+    try {
+      await appendObserveRecord(this.env, record);
+    } catch {
+      this.stderr?.write("condense: failed to write observe record.\n");
+    }
+    return record.suspectReasons.length > 0 ? record.suspectReasons : undefined;
   }
 
   private async captureStatsRecord(
     rawInput: string,
     output: string,
     durationMs: number,
-    timings?: CompletionTimings
+    timings?: CompletionTimings,
+    bypass?: CondenseSkipReason,
+    suspect?: string[]
   ): Promise<SingleRunStat | undefined> {
     if (!this.runtimeConfig) {
       return undefined;
@@ -209,7 +312,7 @@ export class CondenseSession {
 
     try {
       const stat = await recordCondenseRun(this.env, {
-        cwd: process.cwd(),
+        cwd: this.cwd,
         question: this.runtimeConfig.question,
         rawInput,
         output,
@@ -218,7 +321,9 @@ export class CondenseSession {
         promptN: timings?.promptN,
         promptMs: timings?.promptMs,
         predictedMs: timings?.predictedMs,
-        cacheSavedMs: timings?.cacheSavedMs
+        cacheSavedMs: timings?.cacheSavedMs,
+        bypass,
+        suspect
       });
 
       if (this.onBatchStat) {
@@ -485,21 +590,31 @@ export class CondenseSession {
 
     this.renderedPairs.add(key);
     this.queue = this.queue.then(async () => {
+      const startedAt = Date.now();
       try {
         const summary = await this.summarizer.summarizeWatch(
           previous.normalized,
           current.normalized
         );
+        const durationMs = Date.now() - startedAt;
 
         if (looksLikeBadDistillation(current.normalized, summary)) {
           this.renderWatchFallback(current.raw);
+          await this.captureStatsRecord(current.raw, current.raw, durationMs);
           return;
         }
 
-        this.renderWatchSummary(summary.trim());
+        const output = summary.trim();
+        this.renderWatchSummary(output);
+        await this.captureStatsRecord(current.raw, output, durationMs);
         this.trimWatchHistory();
       } catch {
         this.renderWatchFallback(current.raw);
+        await this.captureStatsRecord(
+          current.raw,
+          current.raw,
+          Date.now() - startedAt
+        );
       }
     });
   }

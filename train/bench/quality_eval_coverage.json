@@ -1,0 +1,38 @@
+{
+  "n": 100,
+  "source": "train/data/labeled/valid.jsonl",
+  "held_out": true,
+  "tasks": {
+    "pass_fail": 16,
+    "docker_k8s": 24,
+    "generic": 26,
+    "typescript_check": 15,
+    "terraform_plan": 10,
+    "security_audit": 9
+  },
+  "tags": {
+    "empty": 16,
+    "pass_fail": 16,
+    "docker_k8s": 24,
+    "long": 15,
+    "generic": 26,
+    "multi_error": 20,
+    "ts": 16,
+    "ts_multi": 16,
+    "typescript_check": 15,
+    "contradiction": 19,
+    "terraform": 10,
+    "terraform_plan": 10,
+    "audit": 9,
+    "security_audit": 9
+  },
+  "focus": {
+    "terraform": 10,
+    "audit": 9,
+    "ts_multi": 16,
+    "multi_error": 20,
+    "empty": 16,
+    "contradiction": 19,
+    "long": 15
+  }
+}

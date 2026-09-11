@@ -1,0 +1,292 @@
+{
+  "v2": {
+    "overall": {
+      "n": 100,
+      "accuracy": 0.56,
+      "miss_rate": 0.27,
+      "hallucination_rate": 0.02,
+      "format_ok": 0.91
+    },
+    "served": {
+      "n": 94,
+      "accuracy": 0.596,
+      "miss_rate": 0.266,
+      "hallucination_rate": 0.021,
+      "format_ok": 0.968
+    },
+    "by_task": {
+      "audit": {
+        "n": 9,
+        "accuracy": 0.778,
+        "miss_rate": 0.333,
+        "hallucination_rate": 0.0,
+        "format_ok": 0.667
+      },
+      "contradiction": {
+        "n": 19,
+        "accuracy": 0.316,
+        "miss_rate": 0.316,
+        "hallucination_rate": 0.0,
+        "format_ok": 0.789
+      },
+      "docker_k8s": {
+        "n": 24,
+        "accuracy": 0.583,
+        "miss_rate": 0.167,
+        "hallucination_rate": 0.0,
+        "format_ok": 0.75
+      },
+      "empty": {
+        "n": 16,
+        "accuracy": 0.625,
+        "miss_rate": 0.0,
+        "hallucination_rate": 0.125,
+        "format_ok": 0.875
+      },
+      "generic": {
+        "n": 26,
+        "accuracy": 0.538,
+        "miss_rate": 0.269,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "long": {
+        "n": 15,
+        "accuracy": 0.2,
+        "miss_rate": 0.267,
+        "hallucination_rate": 0.0,
+        "format_ok": 0.6
+      },
+      "multi_error": {
+        "n": 20,
+        "accuracy": 0.55,
+        "miss_rate": 0.4,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "pass_fail": {
+        "n": 16,
+        "accuracy": 0.438,
+        "miss_rate": 0.125,
+        "hallucination_rate": 0.125,
+        "format_ok": 1.0
+      },
+      "security_audit": {
+        "n": 9,
+        "accuracy": 0.778,
+        "miss_rate": 0.333,
+        "hallucination_rate": 0.0,
+        "format_ok": 0.667
+      },
+      "terraform": {
+        "n": 10,
+        "accuracy": 0.6,
+        "miss_rate": 0.3,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "terraform_plan": {
+        "n": 10,
+        "accuracy": 0.6,
+        "miss_rate": 0.3,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "ts": {
+        "n": 16,
+        "accuracy": 0.5,
+        "miss_rate": 0.5,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "ts_multi": {
+        "n": 16,
+        "accuracy": 0.5,
+        "miss_rate": 0.5,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "typescript_check": {
+        "n": 15,
+        "accuracy": 0.533,
+        "miss_rate": 0.533,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      }
+    },
+    "errors": 6,
+    "ctx_overflow": 6
+  },
+  "distill2": {
+    "overall": {
+      "n": 100,
+      "accuracy": 0.41,
+      "miss_rate": 0.36,
+      "hallucination_rate": 0.06,
+      "format_ok": 0.96
+    },
+    "served": {
+      "n": 100,
+      "accuracy": 0.41,
+      "miss_rate": 0.36,
+      "hallucination_rate": 0.06,
+      "format_ok": 0.96
+    },
+    "by_task": {
+      "audit": {
+        "n": 9,
+        "accuracy": 0.556,
+        "miss_rate": 0.333,
+        "hallucination_rate": 0.0,
+        "format_ok": 0.556
+      },
+      "contradiction": {
+        "n": 19,
+        "accuracy": 0.368,
+        "miss_rate": 0.368,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "docker_k8s": {
+        "n": 24,
+        "accuracy": 0.417,
+        "miss_rate": 0.083,
+        "hallucination_rate": 0.125,
+        "format_ok": 1.0
+      },
+      "empty": {
+        "n": 16,
+        "accuracy": 0.0,
+        "miss_rate": 0.0,
+        "hallucination_rate": 0.312,
+        "format_ok": 1.0
+      },
+      "generic": {
+        "n": 26,
+        "accuracy": 0.308,
+        "miss_rate": 0.385,
+        "hallucination_rate": 0.038,
+        "format_ok": 1.0
+      },
+      "long": {
+        "n": 15,
+        "accuracy": 0.4,
+        "miss_rate": 0.2,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "multi_error": {
+        "n": 20,
+        "accuracy": 0.5,
+        "miss_rate": 0.65,
+        "hallucination_rate": 0.05,
+        "format_ok": 1.0
+      },
+      "pass_fail": {
+        "n": 16,
+        "accuracy": 0.25,
+        "miss_rate": 0.25,
+        "hallucination_rate": 0.125,
+        "format_ok": 1.0
+      },
+      "security_audit": {
+        "n": 9,
+        "accuracy": 0.556,
+        "miss_rate": 0.333,
+        "hallucination_rate": 0.0,
+        "format_ok": 0.556
+      },
+      "terraform": {
+        "n": 10,
+        "accuracy": 0.5,
+        "miss_rate": 0.5,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "terraform_plan": {
+        "n": 10,
+        "accuracy": 0.5,
+        "miss_rate": 0.5,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "ts": {
+        "n": 16,
+        "accuracy": 0.562,
+        "miss_rate": 0.812,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "ts_multi": {
+        "n": 16,
+        "accuracy": 0.562,
+        "miss_rate": 0.812,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      },
+      "typescript_check": {
+        "n": 15,
+        "accuracy": 0.6,
+        "miss_rate": 0.8,
+        "hallucination_rate": 0.0,
+        "format_ok": 1.0
+      }
+    },
+    "errors": 0,
+    "ctx_overflow": 0
+  },
+  "decision": {
+    "v2_better_overall": true,
+    "weak_slices": [],
+    "recommendation": "ship_v2",
+    "ship_v2": true,
+    "note": "Format-all can be pulled down by llama.cpp slot overflows (--ctx-size 20480 / --parallel 5 = 4096 tokens). Decision uses overall accuracy/hallucination and served format."
+  },
+  "counts": {
+    "pass_fail": 16,
+    "docker_k8s": 24,
+    "generic": 26,
+    "typescript_check": 15,
+    "terraform_plan": 10,
+    "security_audit": 9
+  },
+  "n": 100,
+  "coverage": {
+    "n": 100,
+    "source": "train/data/labeled/valid.jsonl",
+    "held_out": true,
+    "tasks": {
+      "pass_fail": 16,
+      "docker_k8s": 24,
+      "generic": 26,
+      "typescript_check": 15,
+      "terraform_plan": 10,
+      "security_audit": 9
+    },
+    "tags": {
+      "empty": 16,
+      "pass_fail": 16,
+      "docker_k8s": 24,
+      "long": 15,
+      "generic": 26,
+      "multi_error": 20,
+      "ts": 16,
+      "ts_multi": 16,
+      "typescript_check": 15,
+      "contradiction": 19,
+      "terraform": 10,
+      "terraform_plan": 10,
+      "audit": 9,
+      "security_audit": 9
+    },
+    "focus": {
+      "terraform": 10,
+      "audit": 9,
+      "ts_multi": 16,
+      "multi_error": 20,
+      "empty": 16,
+      "contradiction": 19,
+      "long": 15
+    }
+  }
+}

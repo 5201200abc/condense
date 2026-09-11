@@ -44,6 +44,20 @@ describe("parseCompletionTimings", () => {
       cacheSavedMs: 293
     });
   });
+
+  it("does not invent seconds saved when prompt_n is too small", () => {
+    expect(
+      parseCompletionTimings({
+        timings: {
+          cache_n: 339,
+          prompt_n: 4,
+          prompt_ms: 19,
+          predicted_ms: 80,
+          predicted_n: 8
+        }
+      })?.cacheSavedMs
+    ).toBe(0);
+  });
 });
 
 describe("chatCompletion", () => {
