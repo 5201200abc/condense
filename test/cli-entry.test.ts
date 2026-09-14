@@ -179,8 +179,8 @@ describe("cli entrypoint", () => {
       });
 
       expect(showStats.status).toBe(0);
-      expect(showStats.stdout).toContain("Condense Character Savings Summary (Global)");
-      expect(showStats.stdout).toContain("No condense runs recorded yet.");
+      expect(showStats.stdout).toContain("Condense Stats · Global");
+      expect(showStats.stdout).toContain("Compressed          0 times");
 
       const showJson = spawnSync("bun", ["run", cli, "stats", "--json"], {
         cwd: root,
@@ -189,9 +189,9 @@ describe("cli entrypoint", () => {
       });
 
       expect(showJson.status).toBe(0);
-      const parsed = JSON.parse(showJson.stdout) as { scope: string; summary: { calls: number } };
-      expect(parsed.scope).toBe("Global");
-      expect(parsed.summary.calls).toBe(0);
+      const parsed = JSON.parse(showJson.stdout) as { compressed: number; freedEstimatedTokens: number };
+      expect(parsed.compressed).toBe(0);
+      expect(parsed.freedEstimatedTokens).toBe(0);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

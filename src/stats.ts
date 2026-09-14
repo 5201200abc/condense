@@ -4,6 +4,14 @@ import path from "node:path";
 
 import { UsageError } from "./config";
 import { estimateCacheSavedMs } from "./llm";
+import {
+  clearObserveRecords,
+  formatWindowBucket,
+  matchesClient,
+  normalizeClientName,
+  readObserveRecords,
+  type ObserveRecord
+} from "./observe";
 import { isLongLog, isOverflowRisk, type CondenseSkipReason } from "./policy";
 import { hashProjectPath } from "./dsl-memory";
 import { withFileLock } from "./file-lock";
@@ -90,10 +98,12 @@ export interface RecordCondenseRunOptions {
 export interface FormatStatsOptions {
   projectHash?: string;
   projectPath?: string;
+  client?: string;
   days?: number;
   json?: boolean;
   history?: boolean;
   now?: Date;
+  observeRecords?: ObserveRecord[];
 }
 
 export interface StatsCommandContext {
@@ -558,7 +568,8 @@ export async function resetStats(
 
       if (!options.projectHash) {
         await rm(statsPath, { force: true });
-        return "Global character savings stats reset successfully.\n";
+        await clearObserveRecords(env);
+        return "Global statistics reset successfully.\n";
       }
 
       const stats = await readStatsFile(env);
@@ -724,276 +735,491 @@ function selectProjectView(
   };
 }
 
-function formatHistoryTimestamp(isoString: string): string {
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) {
-    return "00-00 00:00";
+export function formatTokenMetric(tokens: number): string {
+  if (!tokens || tokens <= 0) {
+    return "0";
   }
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${month}-${day} ${hours}:${minutes}`;
+  if (tokens >= 1_000_000) {
+    const val = tokens / 1_000_000;
+    const formatted = val >= 10 ? val.toFixed(1) : val.toFixed(2);
+    return `${parseFloat(formatted)}M`;
+  }
+  if (tokens >= 1_000) {
+    const val = tokens / 1_000;
+    const formatted = val >= 100 ? Math.round(val).toString() : val.toFixed(1);
+    return `${parseFloat(formatted)}K`;
+  }
+  return tokens.toLocaleString();
 }
 
-function formatRecentCommands(
-  runs: SingleRunStat[],
-  maxCount: number = 15,
-  scope: "global" | "project" = "global"
-): string[] {
-  if (runs.length === 0) {
-    return [];
+export function formatStatsHelp(): string {
+  return [
+    "Usage:",
+    "  condense stats [options]",
+    "",
+    "Options:",
+    "  --project              Current project only",
+    "  --client <name>        Filter by client",
+    "  --days <n>             Last N days",
+    "  -H, --history          Show recent compression history",
+    "  --json                 Machine-readable output",
+    "  --reset                Reset statistics",
+    "  -h, --help             Show stats help",
+    ""
+  ].join("\n");
+}
+
+export function formatSuspectReason(reason: string): string {
+  switch (reason) {
+    case "mixed_pass_fail":
+      return "Mixed PASS/FAIL";
+    case "empty_as_fail":
+      return "Timeout / no result";
+    case "terraform_destructive":
+      return "Terraform unsafe";
+    case "missed_fail":
+    case "missed_critical":
+      return "Dropped error";
+    default:
+      return reason;
   }
+}
 
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(
-    scope === "project"
-      ? "Condense Recent Commands (this project)"
-      : "Condense Recent Commands (global)"
-  );
-  lines.push("------------------------------------------------------------");
-
-  const items = runs.slice(0, maxCount);
-  for (const run of items) {
-    const timeStr = formatHistoryTimestamp(run.timestamp);
-    const rawDesc =
-      run.question && run.question !== "condense"
-        ? run.question.trim()
-        : "pipeline command";
-    const truncatedDesc =
-      rawDesc.length > 36 ? `${rawDesc.slice(0, 33)}...` : rawDesc;
-    const ratioStr = `-${run.charCompressionRatio.toFixed(0)}%`;
-    const savedStr = `(${run.savedChars.toLocaleString()} chars)`;
-
-    lines.push(
-      `${timeStr}  ${truncatedDesc.padEnd(38)} ${ratioStr.padStart(5)} ${savedStr}`
-    );
+function formatSuspectDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return "01-01 00:00";
   }
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${mm}-${dd} ${hh}:${min}`;
+}
 
-  return lines;
+function formatHistoryDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return "01-01 00:00";
+  }
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${mm}-${dd} ${hh}:${min}`;
+}
+
+function formatStatsRow(
+  label: string,
+  value: number | string,
+  totalWidth: number = 25
+): string {
+  const valStr = value.toString();
+  const spaces = Math.max(1, totalWidth - label.length - valStr.length);
+  return `${label}${" ".repeat(spaces)}${valStr}`;
 }
 
 export function formatStatsReport(
   stats: StatsStorageFile,
   options: FormatStatsOptions = {}
 ): string {
-  const isProject = Boolean(options.projectHash || options.projectPath);
-  let targetSummary: MetricSummary = stats.totals;
-  let scopeLabel = "Global";
-  let recentRuns = stats.recent;
-  let projectDaily: Record<string, MetricSummary> | undefined;
-  let projectDisplayPath = "";
+  const now = options.now ?? new Date();
+  let records: ObserveRecord[] = options.observeRecords ? [...options.observeRecords] : [];
 
-  if (isProject) {
-    const selected = selectProjectView(stats, options);
-    targetSummary = selected.summary;
-    recentRuns = selected.recent;
-    projectDaily = selected.summary.daily;
-    projectDisplayPath = selected.displayPath;
-    scopeLabel = `Project: ${selected.displayPath}`;
+  if (records.length === 0 && stats.recent && stats.recent.length > 0) {
+    for (const run of stats.recent) {
+      if (run.bypass) {
+        continue;
+      }
+      records.push({
+        requestId:
+          (run as any).requestId ??
+          hashProjectPath(run.projectPath ?? run.projectHash)?.slice(0, 8) ??
+          "00000000",
+        timestamp: run.timestamp,
+        kinds: [
+          ...(isLongLog(run.inputChars, run.inputLines) ? ["long" as const] : []),
+          ...(isOverflowRisk(run.inputChars) ? ["overflow" as const] : []),
+          ...(run.suspect && run.suspect.length > 0 ? ["suspect" as const] : [])
+        ],
+        suspectReasons: run.suspect ?? [],
+        question: run.question ?? "",
+        inputChars: run.inputChars,
+        inputLines: run.inputLines,
+        outputChars: run.outputChars,
+        rawEstimatedTokens: run.inputTokens,
+        outputEstimatedTokens: run.outputTokens,
+        output: "",
+        client: (run as any).client ?? "Unknown",
+        model: (run as any).model ?? "v2",
+        contextWindowTokens: (run as any).contextWindowTokens,
+        latencyMs: run.durationMs,
+        projectPath: run.projectPath
+      });
+    }
+  } else if (records.length === 0 && stats.totals.calls > 0) {
+    const count = stats.totals.calls;
+    const inputCharsPerRun = Math.round(stats.totals.inputChars / count);
+    const outputCharsPerRun = Math.round(stats.totals.outputChars / count);
+    const rawTokensPerRun = Math.round(
+      (stats.totals.inputTokens || Math.round(stats.totals.inputChars / 4)) / count
+    );
+    const outputTokensPerRun = Math.round(
+      (stats.totals.outputTokens || Math.round(stats.totals.outputChars / 4)) / count
+    );
+    const latencyPerRun = Math.round(stats.totals.durationMs / count);
+    for (let i = 0; i < count; i++) {
+      records.push({
+        requestId: `req_${i.toString().padStart(8, "0")}`,
+        timestamp: stats.updatedAt || new Date().toISOString(),
+        kinds: [],
+        suspectReasons: [],
+        question: "",
+        inputChars: inputCharsPerRun,
+        inputLines: Math.round(stats.totals.inputLines / count),
+        outputChars: outputCharsPerRun,
+        rawEstimatedTokens: rawTokensPerRun,
+        outputEstimatedTokens: outputTokensPerRun,
+        output: "",
+        client: "Unknown",
+        model: "v2",
+        latencyMs: latencyPerRun
+      });
+    }
+  }
+
+  const isProject = Boolean(options.projectHash || options.projectPath);
+  const targetProjectPath = options.projectPath
+    ? resolveStatsProjectPath(options.projectPath)
+    : undefined;
+
+  if (targetProjectPath) {
+    records = records.filter((r) => {
+      if (!r.projectPath) {
+        return false;
+      }
+      return (
+        resolveStatsProjectPath(r.projectPath) === targetProjectPath ||
+        isPathInside(r.projectPath, targetProjectPath)
+      );
+    });
+  }
+
+  if (options.client) {
+    records = records.filter((r) => matchesClient(r.client, options.client!));
   }
 
   if (options.days && options.days > 0) {
-    const now = options.now ?? new Date();
-    const cutoffDate = new Date(now.getTime());
-    cutoffDate.setUTCDate(cutoffDate.getUTCDate() - options.days);
-    const cutoffKey = cutoffDate.toISOString().slice(0, 10);
+    const cutoffDate = new Date(now.getTime() - options.days * 24 * 60 * 60 * 1000);
     const cutoffIso = cutoffDate.toISOString();
+    records = records.filter((r) => r.timestamp >= cutoffIso);
+  }
 
-    const dailySource = isProject
-      ? projectDaily && Object.keys(projectDaily).length > 0
-        ? projectDaily
-        : (() => {
-            const reconstructed: Record<string, MetricSummary> = {};
-            for (const run of recentRuns) {
-              const dayKey = run.timestamp.slice(0, 10);
-              if (!reconstructed[dayKey]) {
-                reconstructed[dayKey] = emptyMetricSummary();
-              }
-              updateMetricSummary(reconstructed[dayKey], run);
-            }
-            return reconstructed;
-          })()
-      : stats.daily;
+  const isValidActiveRecord = (r: ObserveRecord): boolean => {
+    if (!r.requestId || r.requestId === "00000000" || r.requestId.trim() === "") {
+      return false;
+    }
+    const raw = typeof r.rawEstimatedTokens === "number" ? r.rawEstimatedTokens : 0;
+    const out = typeof r.outputEstimatedTokens === "number" ? r.outputEstimatedTokens : 0;
+    return raw > 0 || out > 0;
+  };
 
-    const filteredSummary = emptyMetricSummary();
-    for (const [dayKey, dayStat] of Object.entries(dailySource)) {
-      if (dayKey >= cutoffKey) {
-        addMetricSummary(filteredSummary, dayStat);
+  const activeRecords = records.filter(isValidActiveRecord);
+  const legacyRecords = records.filter((r) => !isValidActiveRecord(r));
+
+  const compressed = activeRecords.length;
+  const freedEstimatedTokens = activeRecords.reduce(
+    (sum, r) => sum + Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens),
+    0
+  );
+  const avgFreedEstimatedTokens =
+    compressed > 0 ? Math.round(freedEstimatedTokens / compressed) : 0;
+  const largestFreedEstimatedTokens =
+    compressed > 0
+      ? Math.max(
+          ...activeRecords.map((r) =>
+            Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens)
+          )
+        )
+      : 0;
+  const overflowRisk = activeRecords.filter(
+    (r) => r.kinds.includes("overflow") || isOverflowRisk(r.inputChars)
+  ).length;
+
+  const suspectRecords = activeRecords.filter((r) => r.suspectReasons.length > 0);
+  const suspects = suspectRecords.length;
+  const mixedPassFail = activeRecords.filter((r) =>
+    r.suspectReasons.includes("mixed_pass_fail")
+  ).length;
+  const timeoutNoResult = activeRecords.filter((r) =>
+    r.suspectReasons.includes("empty_as_fail")
+  ).length;
+  const terraformUnsafe = activeRecords.filter((r) =>
+    r.suspectReasons.includes("terraform_destructive")
+  ).length;
+  const droppedError = activeRecords.filter(
+    (r) =>
+      r.suspectReasons.includes("missed_fail") ||
+      r.suspectReasons.includes("missed_critical")
+  ).length;
+
+  const clientCounts: Record<string, number> = {};
+  for (const r of activeRecords) {
+    const c = normalizeClientName(r.client);
+    clientCounts[c] = (clientCounts[c] ?? 0) + 1;
+  }
+  const sortedClients = Object.entries(clientCounts).sort((a, b) => b[1] - a[1]);
+
+  const hasExplicitWindows = activeRecords.some(
+    (r) => r.contextWindowTokens !== undefined && r.contextWindowTokens > 0
+  );
+  const windowBuckets: Record<
+    string,
+    {
+      tokens?: number;
+      runs: number;
+      recoveredPercents: number[];
+      avgRecoveredPercent?: number;
+      largestRecoveredPercent?: number;
+    }
+  > = {};
+
+  if (hasExplicitWindows) {
+    for (const r of activeRecords) {
+      const bucketLabel = formatWindowBucket(r.contextWindowTokens);
+      if (!windowBuckets[bucketLabel]) {
+        windowBuckets[bucketLabel] = {
+          tokens: r.contextWindowTokens,
+          runs: 0,
+          recoveredPercents: []
+        };
+      }
+      windowBuckets[bucketLabel].runs += 1;
+      if (r.contextWindowTokens && r.contextWindowTokens > 0) {
+        const freed = Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens);
+        const rec = Math.round((freed / r.contextWindowTokens) * 100);
+        windowBuckets[bucketLabel].recoveredPercents.push(rec);
       }
     }
-    targetSummary = filteredSummary;
-    scopeLabel = `${scopeLabel} (Last ${options.days} days)`;
-    recentRuns = recentRuns.filter((entry) => entry.timestamp >= cutoffIso);
+    for (const b of Object.values(windowBuckets)) {
+      if (b.recoveredPercents.length > 0) {
+        const sum = b.recoveredPercents.reduce((acc, p) => acc + p, 0);
+        b.avgRecoveredPercent = Math.round(sum / b.runs);
+        b.largestRecoveredPercent = Math.max(...b.recoveredPercents);
+      }
+    }
+  }
+
+  if (options.history) {
+    const lines: string[] = ["Recent compressions", "------------"];
+    if (activeRecords.length === 0) {
+      lines.push("(none)");
+      return `${lines.join("\n")}\n`;
+    }
+
+    const sorted = [...activeRecords].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    const items = sorted.slice(0, 15);
+    for (const r of items) {
+      const dateStr = formatHistoryDate(r.timestamp);
+      const clientStr = normalizeClientName(r.client).padEnd(13);
+      const freed = Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens);
+      const freedStr = ("freed " + formatTokenMetric(freed)).padEnd(13);
+      const status =
+        r.suspectReasons.length > 0
+          ? `SUSPECT  ${r.requestId.slice(0, 8)}`
+          : "OK";
+      lines.push(`${dateStr}  ${clientStr}  ${freedStr}${status}`);
+    }
+    return `${lines.join("\n")}\n`;
   }
 
   if (options.json) {
-    const charCompressionRatio =
-      targetSummary.inputChars > 0
-        ? Number(((targetSummary.savedChars / targetSummary.inputChars) * 100).toFixed(2))
-        : 0;
-    const lineCompressionRatio =
-      targetSummary.inputLines > 0
-        ? Number(((targetSummary.savedLines / targetSummary.inputLines) * 100).toFixed(2))
-        : 0;
-    const tokenCompressionRatio =
-      targetSummary.inputTokens > 0
-        ? Number(((targetSummary.savedTokens / targetSummary.inputTokens) * 100).toFixed(2))
-        : 0;
+    let bypassed = 0;
+    if (stats.recent) {
+      for (const run of stats.recent) {
+        if (!run.bypass) continue;
+        if (targetProjectPath && run.projectPath) {
+          if (
+            resolveStatsProjectPath(run.projectPath) !== targetProjectPath &&
+            !isPathInside(run.projectPath, targetProjectPath)
+          ) {
+            continue;
+          }
+        }
+        if (options.days && options.days > 0) {
+          const cutoffDate = new Date(now.getTime() - options.days * 24 * 60 * 60 * 1000);
+          if (run.timestamp < cutoffDate.toISOString()) continue;
+        }
+        bypassed += 1;
+      }
+    }
+
     const avgDurationMs =
-      targetSummary.calls > 0
-        ? Math.round(targetSummary.durationMs / targetSummary.calls)
+      compressed > 0
+        ? Math.round(activeRecords.reduce((sum, r) => sum + r.latencyMs, 0) / compressed)
         : 0;
-    const cacheSample = summarizeCacheSample(targetSummary, recentRuns);
+
+    const cacheSample = summarizeCacheSample(stats.totals, stats.recent ?? []);
     const cacheTokens = cacheSample.cacheN + cacheSample.promptN;
     const cacheHitRatio =
       cacheTokens > 0
         ? Number(((cacheSample.cacheN / cacheTokens) * 100).toFixed(2))
         : 0;
 
-    const payload: Record<string, unknown> = {
-      kind: isProject ? "project" : "global",
-      scope: scopeLabel,
-      summary: {
-        ...targetSummary,
+    const inputChars = records.reduce((sum, r) => sum + r.inputChars, 0);
+    const outputChars = records.reduce((sum, r) => sum + r.outputChars, 0);
+    const savedChars = Math.max(0, inputChars - outputChars);
+    const inputLines = records.reduce((sum, r) => sum + r.inputLines, 0);
+    const outputLines = records.reduce(
+      (sum, r) => sum + (r.output ? r.output.split("\n").length : 0),
+      0
+    );
+    const savedLines = Math.max(0, inputLines - outputLines);
+
+    const jsonWindows: Record<
+      string,
+      { runs: number; avgRecoveredPercent?: number; largestRecoveredPercent?: number }
+    > = {};
+    for (const [key, b] of Object.entries(windowBuckets)) {
+      jsonWindows[key] = {
+        runs: b.runs,
+        ...(b.avgRecoveredPercent !== undefined
+          ? { avgRecoveredPercent: b.avgRecoveredPercent }
+          : {}),
+        ...(b.largestRecoveredPercent !== undefined
+          ? { largestRecoveredPercent: b.largestRecoveredPercent }
+          : {})
+      };
+    }
+
+    const payload = {
+      compressed,
+      freedEstimatedTokens,
+      avgFreedEstimatedTokens,
+      largestFreedEstimatedTokens,
+      overflowRisk,
+      suspects,
+      suspectReasons: {
+        mixedPassFail,
+        timeoutNoResult,
+        terraformUnsafe,
+        droppedError
+      },
+      clients: Object.fromEntries(sortedClients),
+      contextWindows: jsonWindows,
+      bypassed,
+      latency: {
+        avgMs: avgDurationMs,
+        avgS: Number((avgDurationMs / 1000).toFixed(3))
+      },
+      promptCache: {
         cacheN: cacheSample.cacheN,
         promptN: cacheSample.promptN,
         cacheCalls: cacheSample.cacheCalls,
         cacheSavedMs: cacheSample.cacheSavedMs,
-        charCompressionRatio,
-        lineCompressionRatio,
-        tokenCompressionRatio,
-        avgDurationMs,
-        avgDurationS: Number((avgDurationMs / 1000).toFixed(3)),
         cacheHitRatio,
-        cacheSavedS: Number((cacheSample.cacheSavedMs / 1000).toFixed(3)),
-        frontierInputAvoided:
-          targetSummary.savedTokens ?? Math.round((targetSummary.savedChars ?? 0) / 4)
+        cacheSavedS: Number((cacheSample.cacheSavedMs / 1000).toFixed(3))
       },
-      daily: isProject ? (projectDaily ?? {}) : stats.daily,
-      recent: recentRuns
+      volume: {
+        inputChars,
+        outputChars,
+        savedChars,
+        inputLines,
+        outputLines,
+        savedLines,
+        charCompressionRatio:
+          inputChars > 0
+            ? Number(((savedChars / inputChars) * 100).toFixed(2))
+            : 0,
+        lineCompressionRatio:
+          inputLines > 0
+            ? Number(((savedLines / inputLines) * 100).toFixed(2))
+            : 0
+      },
+      legacy: {
+        runs: legacyRecords.length
+      }
     };
-    if (isProject) {
-      payload.projectPath = projectDisplayPath;
-    } else {
-      payload.byProject = stats.byProject;
-    }
     return `${JSON.stringify(payload, null, 2)}\n`;
   }
 
   const lines: string[] = [];
-  lines.push(`Condense Character Savings Summary (${scopeLabel})`);
-  lines.push("============================================================");
+  lines.push(isProject ? "Condense Stats · Project" : "Condense Stats · Global");
+  lines.push("==============================");
+  lines.push("");
+  lines.push("Context");
+  lines.push("------------");
+  lines.push(`Compressed          ${compressed} times`);
+  lines.push(formatStatsRow("Freed", formatTokenMetric(freedEstimatedTokens)));
+  lines.push(formatStatsRow("Avg freed", formatTokenMetric(avgFreedEstimatedTokens)));
+  lines.push(formatStatsRow("Largest", formatTokenMetric(largestFreedEstimatedTokens)));
+  lines.push(formatStatsRow("Overflow risk", overflowRisk));
+  lines.push("");
+  lines.push("Reliability");
+  lines.push("------------");
+  lines.push(formatStatsRow("Suspects", suspects));
+  lines.push(formatStatsRow("  Mixed PASS/FAIL", mixedPassFail));
+  lines.push(formatStatsRow("  Timeout / no result", timeoutNoResult));
+  lines.push(formatStatsRow("  Terraform unsafe", terraformUnsafe));
+  lines.push(formatStatsRow("  Dropped error", droppedError));
 
-  if (targetSummary.calls === 0) {
-    lines.push(
-      isProject
-        ? "No condense runs recorded for this project."
-        : "No condense runs recorded yet."
-    );
-    lines.push("============================================================");
-    return `${lines.join("\n")}\n`;
-  }
-
-  const avgDurationMs = Math.round(targetSummary.durationMs / targetSummary.calls);
-  const smaller = formatSmallerPercent(targetSummary.savedChars, targetSummary.inputChars);
-  lines.push(
-    formatReportRow(
-      "Chars Saved",
-      `${targetSummary.savedChars.toLocaleString()} chars (volume ${smaller})`
-    )
-  );
-  const frontierAvoided =
-    targetSummary.savedTokens ?? Math.round((targetSummary.savedChars ?? 0) / 4);
-  lines.push(
-    formatReportRow(
-      "Frontier input avoided",
-      `${frontierAvoided.toLocaleString()} est. tokens`
-    )
-  );
-  const classified = { bypass: 0, long: 0, overflow: 0 };
-  for (const run of recentRuns) {
-    if (run.bypass) {
-      classified.bypass += 1;
-      continue;
-    }
-    if (isLongLog(run.inputChars, run.inputLines)) {
-      classified.long += 1;
-    }
-    if (isOverflowRisk(run.inputChars)) {
-      classified.overflow += 1;
+  const hasKnownClients = sortedClients.some(([name]) => name !== "Unknown");
+  if (hasKnownClients) {
+    lines.push("");
+    lines.push("Clients");
+    lines.push("------------");
+    for (const [clientName, count] of sortedClients) {
+      lines.push(formatStatsRow(clientName, count));
     }
   }
-  const useStored =
-    targetSummary.longLogCalls +
-      targetSummary.overflowRiskCalls +
-      targetSummary.bypassCalls +
-      targetSummary.suspectCalls >
-    0;
-  lines.push(
-    formatReportRow(
-      "Long logs",
-      `${(useStored ? targetSummary.longLogCalls : classified.long).toLocaleString()} calls`
-    )
-  );
-  lines.push(
-    formatReportRow(
-      "Overflow-risk logs",
-      `${(useStored ? targetSummary.overflowRiskCalls : classified.overflow).toLocaleString()} calls`
-    )
-  );
-  const bypassed = useStored ? targetSummary.bypassCalls : classified.bypass;
-  lines.push(formatReportRow("Bypassed", `${bypassed.toLocaleString()} calls`));
-  const suspectCalls =
-    targetSummary.suspectCalls > 0
-      ? targetSummary.suspectCalls
-      : recentRuns.filter((run) => (run.suspect?.length ?? 0) > 0).length;
-  lines.push(
-    formatReportRow("Suspect summaries", `${suspectCalls.toLocaleString()} calls`)
-  );
-  lines.push(
-    formatReportRow("Total Executions", `${targetSummary.calls.toLocaleString()} calls`)
-  );
-  lines.push(
-    formatReportRow(
-      "Raw Input Processed",
-      `${targetSummary.inputLines.toLocaleString()} lines (${targetSummary.inputChars.toLocaleString()} chars)`
-    )
-  );
-  lines.push(
-    formatReportRow(
-      "Condensed Output",
-      `${targetSummary.outputLines.toLocaleString()} lines (${targetSummary.outputChars.toLocaleString()} chars)`
-    )
-  );
-  lines.push("------------------------------------------------------------");
-  lines.push(formatReportRow("Avg Latency", formatSeconds(avgDurationMs)));
 
-  const cacheSample = summarizeCacheSample(targetSummary, recentRuns);
-  const cacheTokens = cacheSample.cacheN + cacheSample.promptN;
-  const cacheCalls = cacheSample.cacheCalls;
-  lines.push(
-    formatReportRow(
-      "Prompt cache",
-      `${cacheSample.cacheN.toLocaleString()} / ${cacheTokens.toLocaleString()} tok (${cacheCalls}/${targetSummary.calls} calls)`
-    )
-  );
-  lines.push(
-    formatReportRow("Cache time saved", formatSeconds(cacheSample.cacheSavedMs))
-  );
-  lines.push("============================================================");
+  if (hasExplicitWindows) {
+    lines.push("");
+    lines.push("Window impact");
+    lines.push("------------");
 
-  const historyLimit = 15;
-  const historyLines = formatRecentCommands(
-    recentRuns,
-    historyLimit,
-    isProject ? "project" : "global"
-  );
-  if (historyLines.length > 0) {
-    lines.push(...historyLines);
+    const bucketEntries = Object.entries(windowBuckets).sort((a, b) => {
+      const tokA = a[1].tokens ?? -1;
+      const tokB = b[1].tokens ?? -1;
+      return tokB - tokA;
+    });
+
+    for (const [bucketLabel, b] of bucketEntries) {
+      lines.push("");
+      lines.push(bucketLabel);
+      lines.push(formatStatsRow("Runs", b.runs));
+      if (b.avgRecoveredPercent !== undefined) {
+        lines.push(formatStatsRow("Avg recovered", `${b.avgRecoveredPercent}%`));
+      }
+      if (
+        b.runs > 1 &&
+        b.largestRecoveredPercent !== undefined &&
+        b.largestRecoveredPercent > (b.avgRecoveredPercent ?? 0)
+      ) {
+        lines.push(formatStatsRow("Largest recovered", `${b.largestRecoveredPercent}%`));
+      }
+    }
   }
 
+  if (suspects > 0) {
+    const recentSuspects = suspectRecords
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, 5);
+
+    lines.push("");
+    lines.push("Recent suspects");
+    lines.push("------------");
+    for (const s of recentSuspects) {
+      const dateStr = formatSuspectDate(s.timestamp);
+      const idStr = s.requestId.slice(0, 8);
+      const clientStr = normalizeClientName(s.client).padEnd(13);
+      const reasonStr = formatSuspectReason(s.suspectReasons[0] ?? "suspect");
+      lines.push(`${dateStr}  ${idStr}  ${clientStr}${reasonStr}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("Token values are estimated.");
   return `${lines.join("\n")}\n`;
 }
 
@@ -1003,6 +1229,7 @@ export async function runStatsCommand(
 ): Promise<string> {
   const now = context.now ?? new Date();
   let project = false;
+  let clientFilter: string | undefined;
   let json = false;
   let reset = false;
   let history = false;
@@ -1011,8 +1238,22 @@ export async function runStatsCommand(
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
 
+    if (arg === "-h" || arg === "--help") {
+      return formatStatsHelp();
+    }
+
     if (arg === "--project" || arg === "-p") {
       project = true;
+      continue;
+    }
+
+    if (arg === "--client") {
+      const next = args[index + 1];
+      if (!next || next.startsWith("-")) {
+        throw new UsageError("Missing value for --client.");
+      }
+      clientFilter = next.trim();
+      index += 1;
       continue;
     }
 
@@ -1060,12 +1301,16 @@ export async function runStatsCommand(
   }
 
   const stats = await readStatsFile(context.env, now);
+  const observeRecords = await readObserveRecords(context.env);
+
   return formatStatsReport(stats, {
     projectHash,
     projectPath,
+    client: clientFilter,
     days,
     json,
     history,
-    now
+    now,
+    observeRecords
   });
 }

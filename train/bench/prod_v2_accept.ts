@@ -3,12 +3,17 @@ import path from "node:path";
 
 import { resolveRuntimeDefaults, type RuntimeConfig } from "../../src/config";
 import { summarizeBatch } from "../../src/llm";
+import {
+  acceptsMixedPassFailSummary,
+  loadMixedPassFailCases
+} from "./mixed-pass-fail";
 
 const ROOT = path.resolve(import.meta.dir, "../..");
 const GGUF = path.join(ROOT, "train/gguf/v2/condense-0.8B-Q4_K_M.gguf");
 const PREV = path.join(ROOT, "train/bench/official_vs_distill2.json");
 const Q4_REF = path.join(ROOT, "train/bench/v2_f16_align.json");
 const OUT = path.join(ROOT, "train/bench/prod_v2_accept.json");
+const MIXED_PASS_FAIL = path.join(ROOT, "train/bench/mixed_pass_fail_regressions.jsonl");
 const QUESTION_MARK = "\n\nQuestion: ";
 
 process.env.CONDENSE_LLAMA_GGUF = GGUF;
@@ -126,11 +131,65 @@ for (const task of tasks()) {
   );
 }
 
+const regressionResults = [];
+let regressionMatches = 0;
+for (const regression of loadMixedPassFailCases(MIXED_PASS_FAIL)) {
+  const started = Date.now();
+  const pred = (
+    await summarizeBatch({ ...config, question: regression.question }, regression.output)
+  ).trim();
+  const accepted = acceptsMixedPassFailSummary(pred);
+  regressionMatches += accepted ? 1 : 0;
+  regressionResults.push({
+    id: regression.id,
+    task: regression.task,
+    expected_verdict: regression.expectedVerdict,
+    pred: pred.slice(0, 500),
+    accepted,
+    sec: (Date.now() - started) / 1000,
+    provenance: regression.provenance
+  });
+  console.log(
+    `mixed_pass_fail accepted=${accepted} ${regression.id} ${pred.slice(0, 120).replaceAll("\n", " / ")}`
+  );
+}
+
+const regressionGatePassed = regressionMatches === regressionResults.length;
+
 writeFileSync(
   OUT,
-  `${JSON.stringify({ n: results.length, matches, gguf: GGUF, results }, null, 2)}\n`
+  `${JSON.stringify(
+    {
+      n: results.length,
+      matches,
+      gguf: GGUF,
+      results,
+      qualityGates: {
+        mixed_pass_fail: {
+          rule: "explicit failed test or `error: test failed` must produce FAIL, never PASS",
+          required: true,
+          passed: regressionGatePassed,
+          n: regressionResults.length,
+          matches: regressionMatches,
+          results: regressionResults
+        }
+      }
+    },
+    null,
+    2
+  )}\n`
 );
-console.log(JSON.stringify({ n: results.length, matches }));
-if (matches !== results.length) {
+console.log(
+  JSON.stringify({
+    n: results.length,
+    matches,
+    mixed_pass_fail: {
+      n: regressionResults.length,
+      matches: regressionMatches,
+      passed: regressionGatePassed
+    }
+  })
+);
+if (matches !== results.length || !regressionGatePassed) {
   process.exit(1);
 }

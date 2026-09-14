@@ -13,6 +13,7 @@
     "smoke:pack": "bun run scripts/smoke-packages.ts",
     "test": "bun test",
     "test:e2e": "bun test test/e2e.test.ts",
+    "quality:v2": "bun run train/bench/prod_v2_accept.ts",
     "release:check": "bun run scripts/release-check.ts",
     "publish:npm": "sh scripts/publish-npm.sh",
     "verify": "npm run test && npm run build && npm run release:check"

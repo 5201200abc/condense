@@ -18,6 +18,7 @@ V2_TRAIN = ROOT / "train/data/v2/train.jsonl"
 SET_PATH = ROOT / "train/bench/quality_eval.jsonl"
 PRED_PATH = ROOT / "train/bench/quality_eval_preds.json"
 REPORT_PATH = ROOT / "train/bench/quality_eval_report.json"
+MIXED_PASS_FAIL_PATH = ROOT / "train/bench/mixed_pass_fail_regressions.jsonl"
 MAX_INPUT = 8000
 INSUFF = "condense: Insufficient information to output anything."
 VERDICTS = ("PASS", "FAIL", "SAFE", "REVIEW", "UNSAFE", "NONE")
@@ -34,6 +35,12 @@ def load_jsonl(path: Path) -> list[dict]:
             if line.strip():
                 rows.append(json.loads(line))
     return rows
+
+
+def with_required_regressions(rows: list[dict]) -> list[dict]:
+    required = load_jsonl(MIXED_PASS_FAIL_PATH)
+    required_ids = {row["id"] for row in required}
+    return [row for row in rows if row.get("id") not in required_ids] + required
 
 
 def compact_system() -> str:
@@ -107,6 +114,7 @@ def build_set() -> list[dict]:
                 "tags": tag_row(user, gold, meta.get("task") or "generic"),
             }
         )
+    rows = with_required_regressions(rows)
     SET_PATH.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
     return rows
 
@@ -312,6 +320,7 @@ def summarize(rows: list[dict]) -> dict:
             "terraform_plan", "security_audit", "typescript_check", "pass_fail",
             "docker_k8s", "generic", "test_result", "empty", "ts_multi", "long",
             "contradiction", "terraform", "audit", "ts", "multi_error",
+            "mixed_pass_fail", "production_regression", "required_variant",
         }},
         "errors": sum(1 for r in rows if r.get("error")),
         "ctx_overflow": ctx_overflow,
@@ -330,13 +339,27 @@ def decide(report: dict) -> dict:
         if a and b and a["accuracy"] + 0.05 < b["accuracy"]:
             weak.append({"slice": slice_name, "v2": a["accuracy"], "distill2": b["accuracy"]})
     format_ok = v2["format_ok"] >= d2["format_ok"] or v2s["format_ok"] >= d2s["format_ok"]
+    mixed_pass_fail = report["v2"]["by_task"].get("mixed_pass_fail")
+    mixed_pass_fail_gate = bool(
+        mixed_pass_fail
+        and mixed_pass_fail["n"] > 0
+        and mixed_pass_fail["accuracy"] == 1.0
+        and mixed_pass_fail["miss_rate"] == 0.0
+    )
     v2_better = (
         v2["accuracy"] >= d2["accuracy"]
         and v2["hallucination_rate"] <= d2["hallucination_rate"] + 0.02
         and format_ok
     )
-    ship_v2 = v2_better and v2s["format_ok"] >= 0.8 and v2["hallucination_rate"] <= 0.35
-    if v2_better and not weak:
+    ship_v2 = (
+        v2_better
+        and v2s["format_ok"] >= 0.8
+        and v2["hallucination_rate"] <= 0.35
+        and mixed_pass_fail_gate
+    )
+    if not mixed_pass_fail_gate:
+        rec = "do_not_ship_yet"
+    elif v2_better and not weak:
         rec = "ship_v2"
     elif v2_better and weak:
         rec = "ship_v2_then_targeted_v3"
@@ -347,6 +370,14 @@ def decide(report: dict) -> dict:
         "weak_slices": weak,
         "recommendation": rec,
         "ship_v2": ship_v2,
+        "quality_gates": {
+            "mixed_pass_fail": {
+                "required": True,
+                "passed": mixed_pass_fail_gate,
+                "rule": "explicit failed test or `error: test failed` must produce FAIL, never PASS",
+                "metrics": mixed_pass_fail,
+            }
+        },
         "note": (
             "Format-all can be pulled down by llama.cpp slot overflows "
             "(--ctx-size 20480 / --parallel 5 = 4096 tokens). Decision uses "
@@ -366,7 +397,11 @@ def main() -> int:
     parser.add_argument("--from-preds", action="store_true", help="Rescore existing preds only")
     args = parser.parse_args()
 
-    rows = build_set() if args.rebuild_set or not SET_PATH.exists() else load_jsonl(SET_PATH)
+    rows = (
+        build_set()
+        if args.rebuild_set or not SET_PATH.exists()
+        else with_required_regressions(load_jsonl(SET_PATH))
+    )
     if args.from_preds:
         all_preds = json.loads(PRED_PATH.read_text()).get("results") or []
     else:

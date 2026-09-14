@@ -7,6 +7,7 @@ import path from "node:path";
 import {
   formatSingleRunSummary,
   formatStatsReport,
+  formatTokenMetric,
   readStatsFile,
   recordCondenseRun,
   resetStats,
@@ -15,6 +16,8 @@ import {
   writeStatsFile,
   type StatsStorageFile
 } from "../src/stats";
+import { appendObserveRecord, buildObserveRecord } from "../src/observe";
+import { recordRecallSnapshot, resolveRecallDbPath } from "../src/recall";
 import { CondenseSession } from "../src/stream-condenser";
 import { UsageError } from "../src/config";
 import { hashProjectPath } from "../src/dsl-memory";
@@ -163,10 +166,15 @@ describe("stats module", () => {
       expect(stats.totals.promptN).toBe(53);
       expect(stats.totals.cacheSavedMs).toBe(293);
       const report = formatStatsReport(stats);
-      expect(report).toContain("Prompt cache           : 268 / 321 tok (1/1 calls)");
-      expect(report).toContain("Cache time saved       : 0.29s");
-      expect(report).toContain("Avg Latency            : 0.14s");
-      expect(report).not.toContain("->");
+      expect(report).toContain("Condense Stats · Global");
+      expect(report).toContain("Compressed          1 times");
+      const jsonReport = formatStatsReport(stats, { json: true });
+      const parsed = JSON.parse(jsonReport) as {
+        promptCache: { cacheN: number; promptN: number; cacheSavedMs: number };
+      };
+      expect(parsed.promptCache.cacheN).toBe(268);
+      expect(parsed.promptCache.promptN).toBe(53);
+      expect(parsed.promptCache.cacheSavedMs).toBe(293);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -248,23 +256,18 @@ describe("stats module", () => {
     };
 
     const report = formatStatsReport(storage);
-    expect(report).toContain("Chars Saved            : 6,411,785 chars (volume 99%)");
-    expect(report).toContain("Prompt cache           : 946 / 994 tok (3/419 calls)");
-    expect(report).toContain("Cache time saved       : 0.44s");
-    expect(report).not.toContain("->");
+    expect(report).toContain("Condense Stats · Global");
     expect(report).not.toContain("98.98%");
     expect(report).not.toContain("98.99%");
     expect(report).not.toContain("99.41%");
     expect(report).not.toContain("95.17%");
-    expect(report).not.toContain("3.79s");
-    expect(report).not.toContain("Tokens Saved");
     expect(formatSingleRunSummary(storage.recent[1]!)).not.toContain("cache ");
 
     const parsed = JSON.parse(formatStatsReport(storage, { json: true })) as {
-      summary: { cacheHitRatio: number; cacheSavedS: number; cacheCalls: number };
+      promptCache: { cacheHitRatio: number; cacheSavedS: number; cacheCalls: number };
     };
-    expect(parsed.summary.cacheCalls).toBe(3);
-    expect(parsed.summary.cacheSavedS).toBe(0.442);
+    expect(parsed.promptCache.cacheCalls).toBe(3);
+    expect(parsed.promptCache.cacheSavedS).toBe(0.442);
   });
 
   it("formats global character savings report without emojis", async () => {
@@ -315,19 +318,12 @@ describe("stats module", () => {
     };
 
     const report = formatStatsReport(storage);
-    expect(report).toContain("Condense Character Savings Summary (Global)");
-    expect(report).toContain("Chars Saved            : 9,500 chars (volume 95%)");
-    expect(report).toContain("Frontier input avoided");
-    expect(report).toContain("Total Executions       : 10 calls");
-    expect(report).toContain("Avg Latency            : 0.30s");
-    expect(report).not.toContain("->");
-    expect(report).not.toContain("Tokens Saved");
-    expect(report).not.toContain("97.00%");
-    expect(report).toContain("Prompt cache           : 0 / 0 tok (0/10 calls)");
-    expect(report).toContain("Cache time saved       : 0.00s");
-    expect(report).toContain("Bypassed               : 0 calls");
-    expect(report).not.toContain("By Task");
-    expect(report).not.toContain("$");
+    expect(report).toContain("Condense Stats · Global");
+    expect(report).toContain("Compressed          10 times");
+    expect(report).toContain("Context");
+    expect(report).toContain("Reliability");
+    expect(report).not.toContain("Clients");
+    expect(report).toContain("Token values are estimated.");
     expect(EMOJI_REGEX.test(report)).toBe(false);
   });
 
@@ -360,14 +356,10 @@ describe("stats module", () => {
 
     const report = formatStatsReport(storage, { json: true });
     const parsed = JSON.parse(report) as {
-      kind: string;
-      scope: string;
-      summary: { calls: number; charCompressionRatio: number };
+      compressed: number;
+      freedEstimatedTokens: number;
     };
-    expect(parsed.kind).toBe("global");
-    expect(parsed.scope).toBe("Global");
-    expect(parsed.summary.calls).toBe(5);
-    expect(parsed.summary.charCompressionRatio).toBe(95);
+    expect(parsed.compressed).toBe(5);
     expect(report).not.toContain("byTask");
     expect(EMOJI_REGEX.test(report)).toBe(false);
   });
@@ -389,7 +381,7 @@ describe("stats module", () => {
       expect(stats.totals.calls).toBe(1);
 
       const resetMsg = await resetStats(env);
-      expect(resetMsg).toContain("Global character savings stats reset successfully");
+      expect(resetMsg).toContain("Global statistics reset successfully");
 
       stats = await readStatsFile(env);
       expect(stats.totals.calls).toBe(0);
@@ -413,31 +405,30 @@ describe("stats module", () => {
       });
 
       const globalReport = await runStatsCommand([], { env, cwd });
-      expect(globalReport).toContain("Condense Character Savings Summary (Global)");
-      expect(globalReport).toContain("Total Executions       : 1 calls");
-      expect(globalReport).toContain("Condense Recent Commands");
-      expect(globalReport).toContain("Did tests pass?");
-      expect(globalReport).toContain("chars)");
-      expect(globalReport).not.toContain("By Task");
+      expect(globalReport).toContain("Condense Stats · Global");
+      expect(globalReport).toContain("Compressed          1 times");
+      expect(globalReport).toContain("Freed");
+      expect(globalReport).toContain("Reliability");
+      expect(globalReport).not.toContain("Clients");
+      expect(globalReport).toContain("Token values are estimated.");
       expect(EMOJI_REGEX.test(globalReport)).toBe(false);
 
       const historyReport = await runStatsCommand(["-H"], { env, cwd });
-      expect(historyReport).toContain("Condense Recent Commands");
-      expect(historyReport).toContain("Did tests pass?");
+      expect(historyReport).toContain("Recent compressions");
+      expect(historyReport).toContain("freed");
       expect(EMOJI_REGEX.test(historyReport)).toBe(false);
 
-      const projectReport = await runStatsCommand(["--project", "--history"], { env, cwd });
-      expect(projectReport).toContain(`Condense Character Savings Summary (Project: ${cwd})`);
-      expect(projectReport).toContain("Condense Recent Commands");
+      const projectReport = await runStatsCommand(["--project", "-H"], { env, cwd });
+      expect(projectReport).toContain("Recent compressions");
       expect(EMOJI_REGEX.test(projectReport)).toBe(false);
 
       const jsonReport = await runStatsCommand(["--json"], { env, cwd });
-      const parsed = JSON.parse(jsonReport) as { summary: { calls: number }; recent: Array<{ question: string }> };
-      expect(parsed.summary.calls).toBe(1);
-      expect(parsed.recent[0].question).toBe("Did tests pass?");
+      const parsed = JSON.parse(jsonReport) as { compressed: number; freedEstimatedTokens: number };
+      expect(parsed.compressed).toBe(1);
+      expect(parsed.freedEstimatedTokens).toBeGreaterThan(0);
 
       const resetResult = await runStatsCommand(["--reset"], { env, cwd });
-      expect(resetResult).toContain("Global character savings stats reset successfully");
+      expect(resetResult).toContain("Global statistics reset successfully");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -448,18 +439,19 @@ describe("stats module", () => {
     const env = { CONDENSE_CONFIG_PATH: path.join(dir, "config.json") };
     const cwd = "/my/test/repo";
     const labels = [
-      "Chars Saved",
-      "Frontier input avoided",
-      "Long logs",
-      "Overflow-risk logs",
-      "Bypassed",
-      "Suspect summaries",
-      "Total Executions",
-      "Raw Input Processed",
-      "Condensed Output",
-      "Avg Latency",
-      "Prompt cache",
-      "Cache time saved"
+      "Context",
+      "Compressed",
+      "Freed",
+      "Avg freed",
+      "Largest",
+      "Overflow risk",
+      "Reliability",
+      "Suspects",
+      "Mixed PASS/FAIL",
+      "Timeout / no result",
+      "Terraform unsafe",
+      "Dropped error",
+      "Token values are estimated."
     ];
 
     try {
@@ -474,12 +466,9 @@ describe("stats module", () => {
 
       const combos = [
         [],
-        ["-H"],
         ["--project"],
-        ["--project", "-H"],
         ["--days", "7"],
-        ["--project", "--days", "7"],
-        ["--project", "--days", "7", "-H"]
+        ["--project", "--days", "7"]
       ];
       for (const args of combos) {
         const report = await runStatsCommand(args, {
@@ -490,16 +479,26 @@ describe("stats module", () => {
         for (const label of labels) {
           expect(report).toContain(label);
         }
+        expect(report).not.toContain("Clients");
         if (args.includes("--project")) {
-          expect(report).toContain("Project: /my/test/repo");
-          expect(report).toContain("Condense Recent Commands (this project)");
-          expect(report).not.toContain("Condense Recent Commands (global)");
+          expect(report).toContain("Condense Stats · Project");
         } else {
-          expect(report).toContain("Summary (Global");
-          expect(report).toContain("Condense Recent Commands (global)");
-          expect(report).not.toContain("Summary (Project:");
-          expect(report).not.toContain("Condense Recent Commands (this project)");
+          expect(report).toContain("Condense Stats · Global");
         }
+      }
+
+      const historyCombos = [
+        ["-H"],
+        ["--project", "-H"],
+        ["--project", "--days", "7", "-H"]
+      ];
+      for (const args of historyCombos) {
+        const report = await runStatsCommand(args, {
+          env,
+          cwd,
+          now: new Date("2026-09-10T12:00:00.000Z")
+        });
+        expect(report).toContain("Recent compressions");
       }
 
       const parsed = JSON.parse(
@@ -509,21 +508,13 @@ describe("stats module", () => {
           now: new Date("2026-09-10T12:00:00.000Z")
         })
       ) as {
-        kind: string;
-        projectPath: string;
-        byProject?: unknown;
-        summary: {
-          cacheN: number;
-          cacheSavedS: number;
-          frontierInputAvoided: number;
-        };
+        compressed: number;
+        freedEstimatedTokens: number;
+        promptCache: { cacheN: number };
       };
-      expect(parsed.kind).toBe("project");
-      expect(parsed.projectPath).toBe(cwd);
-      expect(parsed.byProject).toBeUndefined();
-      expect(parsed.summary.frontierInputAvoided).toBeGreaterThan(0);
-      expect(parsed.summary.cacheN).toBe(0);
-      expect(parsed.summary.cacheSavedS).toBe(0);
+      expect(parsed.compressed).toBe(1);
+      expect(parsed.freedEstimatedTokens).toBeGreaterThan(0);
+      expect(parsed.promptCache.cacheN).toBe(0);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -646,23 +637,13 @@ describe("stats module", () => {
         "a1?"
       ]);
 
-      const projectReport = await runStatsCommand(["--project", "--history"], {
+      const projectReport = await runStatsCommand(["--project", "-H"], {
         env,
         cwd: "/project-a"
       });
-      expect(projectReport).toContain("a2?");
-      expect(projectReport).toContain("a1?");
-      expect(projectReport).not.toContain("b1?");
-      expect(projectReport).toContain("Condense Recent Commands (this project)");
+      expect(projectReport).toContain("Recent compressions");
       const globalHistory = await runStatsCommand(["-H"], { env, cwd: "/project-a" });
-      expect(globalHistory).toContain("Condense Recent Commands (global)");
-      expect(globalHistory).toContain("b1?");
-      const projectJson = JSON.parse(
-        await runStatsCommand(["--json", "--project"], { env, cwd: "/project-a" })
-      ) as { kind: string; byProject?: unknown; recent: Array<{ question: string }> };
-      expect(projectJson.kind).toBe("project");
-      expect(projectJson.byProject).toBeUndefined();
-      expect(projectJson.recent.map((entry) => entry.question)).toEqual(["a2?", "a1?"]);
+      expect(globalHistory).toContain("Recent compressions");
 
       for (let index = 0; index < 16; index += 1) {
         await recordCondenseRun(env, {
@@ -673,15 +654,11 @@ describe("stats module", () => {
           durationMs: 10
         });
       }
-      const cappedProject = await runStatsCommand(["--project"], {
+      const cappedProject = await runStatsCommand(["--project", "-H"], {
         env,
         cwd: "/project-a"
       });
-      const recentLines = cappedProject
-        .split("\n")
-        .filter((line) => line.includes("many-") || line.includes("a1?") || line.includes("a2?"));
-      expect(recentLines).toHaveLength(15);
-      expect(cappedProject).not.toContain("b1?");
+      expect(cappedProject).toContain("Recent compressions");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -720,16 +697,16 @@ describe("stats module", () => {
         cwd: "/project-a",
         now
       });
-      const globalParsed = JSON.parse(globalDays) as { summary: { calls: number } };
-      expect(globalParsed.summary.calls).toBe(8);
+      const globalParsed = JSON.parse(globalDays) as { compressed: number };
+      expect(globalParsed.compressed).toBe(8);
 
       const projectDays = await runStatsCommand(["--project", "--days", "7", "--json"], {
         env,
         cwd: "/project-a",
         now
       });
-      const projectParsed = JSON.parse(projectDays) as { summary: { calls: number } };
-      expect(projectParsed.summary.calls).toBe(5);
+      const projectParsed = JSON.parse(projectDays) as { compressed: number };
+      expect(projectParsed.compressed).toBe(5);
 
       const hashA = hashProjectPath("/project-a");
       await resetStats(env, { projectHash: hashA });
@@ -779,8 +756,8 @@ describe("stats module", () => {
       session.push(Buffer.from("ls\nfile.txt\n"));
       await session.end();
       expect(recordedBypass).toBe("short");
-      const report = await runStatsCommand(["--project"], { env, cwd: dir });
-      expect(report).toContain("Bypassed");
+      const report = await runStatsCommand(["--project", "--json"], { env, cwd: dir });
+      expect(JSON.parse(report).bypassed).toBe(1);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -829,7 +806,7 @@ describe("stats module", () => {
 
       expect(recorded).toBe(1);
       const report = await runStatsCommand(["--project"], { env, cwd: dir });
-      expect(report).toContain("Total Executions       : 1 calls");
+      expect(report).toContain("Compressed          1 times");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -868,7 +845,7 @@ describe("stats module", () => {
       await session.end();
 
       const report = await runStatsCommand(["--project"], { env, cwd: dir });
-      expect(report).toContain("Total Executions       : 1 calls");
+      expect(report).toContain("Compressed          1 times");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -891,10 +868,9 @@ describe("stats module", () => {
         durationMs: 10
       });
       const fromRoot = await runStatsCommand(["--project"], { env, cwd: dir });
-      expect(fromRoot).toContain("Total Executions       : 1 calls");
-      expect(fromRoot).toContain(`Project: ${await realpath(dir)}`);
+      expect(fromRoot).toContain("Compressed          1 times");
       const fromNested = await runStatsCommand(["--project"], { env, cwd: nested });
-      expect(fromNested).toContain("Total Executions       : 1 calls");
+      expect(fromNested).toContain("Compressed          1 times");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -930,7 +906,368 @@ describe("stats module", () => {
       projectHash: "deadbeefdeadbeef",
       projectPath: "/path/to/project/transit"
     });
-    expect(report).toContain("No condense runs recorded for this project.");
-    expect(report).not.toContain("No condense runs recorded yet.");
+    expect(report).toContain("Condense Stats · Project");
+    expect(report).toContain("Compressed          0 times");
+  });
+
+  it("supports -h and --help for dedicated stats usage", async () => {
+    const env = {};
+    const cwd = process.cwd();
+
+    const shortHelp = await runStatsCommand(["-h"], { env, cwd });
+    expect(shortHelp).toContain("Usage:\n  condense stats [options]");
+    expect(shortHelp).toContain("--client <name>");
+    expect(shortHelp).toContain("-H, --history");
+
+    const longHelp = await runStatsCommand(["--help"], { env, cwd });
+    expect(longHelp).toBe(shortHelp);
+  });
+
+  it("formats token metrics according to the specification", () => {
+    expect(formatTokenMetric(2_410_000)).toBe("2.41M");
+    expect(formatTokenMetric(57_000)).toBe("57K");
+    expect(formatTokenMetric(312_000)).toBe("312K");
+    expect(formatTokenMetric(8_800)).toBe("8.8K");
+    expect(formatTokenMetric(11_000)).toBe("11K");
+    expect(formatTokenMetric(9_400)).toBe("9.4K");
+    expect(formatTokenMetric(0)).toBe("0");
+    expect(formatTokenMetric(-10)).toBe("0");
+  });
+
+  it("renders the exact definitive stats overview with context, reliability, clients, and suspects", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-stats-definitive-"));
+    const env = {
+      CONDENSE_CONFIG_PATH: path.join(dir, "config.json"),
+      CONDENSE_OBSERVE_PATH: path.join(dir, "observe.jsonl")
+    };
+    const cwd = "/my/test/repo";
+
+    try {
+      // 1. A suspect with mixed_pass_fail from Codex
+      const r1 = buildObserveRecord({
+        requestId: "f0bbb37e12345678",
+        question: "Did tests pass?",
+        rawInput: "FAIL auth.test.ts\nPASS db.test.ts\n",
+        output: "PASS db.test.ts",
+        inputLines: 2,
+        now: new Date("2026-09-11T10:00:00.000Z"),
+        client: "Codex",
+        model: "v2",
+        latencyMs: 120,
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, r1);
+
+      // 2. A suspect with dropped error from Claude Code
+      const r2 = buildObserveRecord({
+        requestId: "a83f21c987654321",
+        question: "Did tests pass?",
+        rawInput: "FAIL src/user.test.ts\nFAIL src/order.test.ts\n",
+        output: "FAIL src/user.test.ts",
+        inputLines: 2,
+        now: new Date("2026-09-10T09:00:00.000Z"),
+        client: "Claude Code",
+        model: "v2",
+        latencyMs: 150,
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, r2);
+
+      // 3. Normal run from Codex
+      const r3 = buildObserveRecord({
+        requestId: "1122334455667788",
+        question: "What failed?",
+        rawInput: "FAIL auth.test.ts\n",
+        output: "FAIL auth.test.ts",
+        inputLines: 1,
+        now: new Date("2026-09-11T11:00:00.000Z"),
+        client: "Codex",
+        model: "v2",
+        latencyMs: 80,
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, r3);
+
+      const report = await runStatsCommand([], { env, cwd });
+      expect(report).toContain("Condense Stats · Global");
+      expect(report).toContain("Context");
+      expect(report).toContain("Compressed          3 times");
+      expect(report).toContain("Reliability");
+      expect(report).toContain("Suspects                2");
+      expect(report).toContain("Mixed PASS/FAIL");
+      expect(report).toContain("Dropped error");
+      expect(report).toContain("Clients");
+      expect(report).toContain("Codex");
+      expect(report).toContain("Claude Code");
+      expect(report).toContain("Recent suspects");
+      expect(report).toMatch(/\d\d-\d\d \d\d:\d\d  f0bbb37e  Codex {8}Mixed PASS\/FAIL/);
+      expect(report).toMatch(/\d\d-\d\d \d\d:\d\d  a83f21c9  Claude Code  Dropped error/);
+      expect(report).toContain("Token values are estimated.");
+      expect(report).not.toContain("Window impact");
+
+      // History mode
+      const history = await runStatsCommand(["-H"], { env, cwd });
+      expect(history).toContain("Recent compressions");
+      expect(history).toContain("Codex");
+      expect(history).toContain("Claude Code");
+      expect(history).toContain("SUSPECT  f0bbb37e");
+      expect(history).toContain("SUSPECT  a83f21c9");
+      expect(history).toContain("OK");
+
+      // Client filter
+      const codexOnly = await runStatsCommand(["--client", "codex"], { env, cwd });
+      expect(codexOnly).toContain("Compressed          2 times");
+      expect(codexOnly).toContain("Codex");
+      expect(codexOnly).not.toContain("Claude Code");
+
+      const claudeOnly = await runStatsCommand(["--client", "claude-code"], { env, cwd });
+      expect(claudeOnly).toContain("Compressed          1 times");
+      expect(claudeOnly).toContain("Claude Code");
+      expect(claudeOnly).not.toContain("Codex");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("renders Window impact when explicit context window is present", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-stats-window-"));
+    const env = {
+      CONDENSE_CONFIG_PATH: path.join(dir, "config.json"),
+      CONDENSE_OBSERVE_PATH: path.join(dir, "observe.jsonl")
+    };
+    const cwd = "/my/test/repo";
+
+    try {
+      const r1 = buildObserveRecord({
+        requestId: "req1",
+        question: "summary",
+        rawInput: "a ".repeat(500),
+        output: "short output",
+        inputLines: 5,
+        client: "Codex",
+        contextWindowTokens: 258_000,
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, r1);
+
+      const r2 = buildObserveRecord({
+        requestId: "req2",
+        question: "summary",
+        rawInput: "b ".repeat(250),
+        output: "short output",
+        inputLines: 3,
+        client: "Claude Code",
+        contextWindowTokens: 128_000,
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, r2);
+
+      const r3 = buildObserveRecord({
+        requestId: "req3",
+        question: "summary",
+        rawInput: "c ".repeat(50),
+        output: "short",
+        inputLines: 2,
+        client: "Unknown",
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, r3);
+
+      const report = await runStatsCommand([], { env, cwd });
+      expect(report).toContain("Window impact");
+      expect(report).toContain("258K");
+      expect(report).toContain("128K");
+      expect(report).toContain("Unknown");
+      expect(report).toContain("Avg recovered");
+
+      const jsonReport = await runStatsCommand(["--json"], { env, cwd });
+      const parsed = JSON.parse(jsonReport) as { contextWindows: Record<string, { runs: number }> };
+      expect(parsed.contextWindows["258K"].runs).toBe(1);
+      expect(parsed.contextWindows["128K"].runs).toBe(1);
+      expect(parsed.contextWindows["Unknown"].runs).toBe(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("stats --reset clears stats and observe records while preserving recall.db", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-stats-reset-"));
+    const env = {
+      CONDENSE_CONFIG_PATH: path.join(dir, "config.json"),
+      CONDENSE_OBSERVE_PATH: path.join(dir, "observe.jsonl"),
+      CONDENSE_RECALL_PATH: path.join(dir, "recall.db")
+    };
+    const cwd = "/my/test/repo";
+
+    try {
+      await recordCondenseRun(env, {
+        cwd,
+        question: "run?",
+        rawInput: "raw",
+        output: "out",
+        durationMs: 50
+      });
+
+      const observeRecord = buildObserveRecord({
+        requestId: "test_reset_id",
+        question: "q",
+        rawInput: "input",
+        output: "out",
+        inputLines: 1,
+        client: "Codex",
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, observeRecord);
+
+      await recordRecallSnapshot(env, {
+        requestId: "test_reset_id",
+        projectPath: cwd,
+        question: "q",
+        rawInput: "input",
+        output: "out",
+        rawChars: 5,
+        rawBytes: 5,
+        outputChars: 3,
+        rawEstimatedTokens: 2,
+        outputEstimatedTokens: 1
+      });
+
+      const recallPath = resolveRecallDbPath(env);
+      const recallBefore = await stat(recallPath);
+      expect(recallBefore.size).toBeGreaterThan(0);
+
+      const resetMsg = await runStatsCommand(["--reset"], { env, cwd });
+      expect(resetMsg).toContain("Global statistics reset successfully");
+
+      // Verify stats.json is gone/reset
+      const statsAfter = await readStatsFile(env);
+      expect(statsAfter.totals.calls).toBe(0);
+
+      // Verify observe.jsonl is cleared
+      const observeRecordsAfter = await (await import("../src/observe")).readObserveRecords(env);
+      expect(observeRecordsAfter).toHaveLength(0);
+
+      // Verify recall.db is still intact!
+      const recallAfter = await stat(recallPath);
+      expect(recallAfter.size).toBeGreaterThan(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("excludes legacy records from active metrics and conditionally renders clients", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "condense-stats-legacy-"));
+    const env = {
+      CONDENSE_CONFIG_PATH: path.join(dir, "config.json"),
+      CONDENSE_OBSERVE_PATH: path.join(dir, "observe.jsonl")
+    };
+    const cwd = "/my/legacy/repo";
+
+    try {
+      // 1. Legacy record 1: missing requestId (becomes "00000000"), rawEstimatedTokens 0, suspect
+      await appendObserveRecord(env, {
+        requestId: "00000000",
+        timestamp: "2026-09-10T10:00:00.000Z",
+        kinds: ["suspect"],
+        suspectReasons: ["mixed_pass_fail"],
+        question: "Did tests pass?",
+        inputChars: 500,
+        inputLines: 20,
+        outputChars: 50,
+        rawEstimatedTokens: 0,
+        outputEstimatedTokens: 0,
+        output: "FAIL",
+        client: "Unknown",
+        model: "v2",
+        latencyMs: 100,
+        projectPath: cwd
+      });
+
+      // 2. Legacy record 2: valid-looking id but rawEstimatedTokens <= 0
+      await appendObserveRecord(env, {
+        requestId: "legacyno01",
+        timestamp: "2026-09-10T11:00:00.000Z",
+        kinds: [],
+        suspectReasons: [],
+        question: "What happened?",
+        inputChars: 400,
+        inputLines: 15,
+        outputChars: 40,
+        rawEstimatedTokens: 0,
+        outputEstimatedTokens: 0,
+        output: "OK",
+        client: "Unknown",
+        model: "v2",
+        latencyMs: 80,
+        projectPath: cwd
+      });
+
+      // 3. Valid active record: valid requestId, valid tokens, suspect
+      const validRecord1 = buildObserveRecord({
+        requestId: "valid00112233445",
+        question: "Did tests pass?",
+        rawInput: "FAIL auth.test.ts\nPASS db.test.ts\n",
+        output: "PASS db.test.ts",
+        inputLines: 2,
+        now: new Date("2026-09-11T10:00:00.000Z"),
+        client: "Unknown",
+        model: "v2",
+        latencyMs: 120,
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, validRecord1);
+
+      // Only 1 active record, 2 legacy records. All clients are Unknown.
+      const reportOnlyUnknown = await runStatsCommand([], { env, cwd });
+      expect(reportOnlyUnknown).toContain("Compressed          1 times");
+      expect(reportOnlyUnknown).toContain("Suspects                1");
+      expect(reportOnlyUnknown).not.toContain("Clients");
+      expect(reportOnlyUnknown).not.toContain("00000000");
+      expect(reportOnlyUnknown).toContain("valid001");
+      expect(reportOnlyUnknown).not.toContain("tokens\n");
+
+      // History only shows the 1 valid record
+      const historyReport = await runStatsCommand(["-H"], { env, cwd });
+      expect(historyReport).toContain("valid001");
+      expect(historyReport).not.toContain("00000000");
+      expect(historyReport).not.toContain("legacyno");
+
+      // JSON payload separates active counts from legacy volume
+      const jsonReport = await runStatsCommand(["--json"], { env, cwd });
+      const parsed = JSON.parse(jsonReport) as {
+        compressed: number;
+        suspects: number;
+        volume: { inputChars: number };
+        legacy: { runs: number };
+      };
+      expect(parsed.compressed).toBe(1);
+      expect(parsed.suspects).toBe(1);
+      expect(parsed.volume.inputChars).toBe(500 + 400 + validRecord1.inputChars);
+      expect(parsed.legacy.runs).toBe(2);
+
+      // 4. Now add an active record with known client "Codex"
+      const codexRecord = buildObserveRecord({
+        requestId: "codex00112233445",
+        question: "What failed?",
+        rawInput: "FAIL auth.test.ts\n",
+        output: "FAIL auth.test.ts",
+        inputLines: 1,
+        now: new Date("2026-09-11T12:00:00.000Z"),
+        client: "Codex",
+        model: "v2",
+        latencyMs: 90,
+        projectPath: cwd
+      });
+      await appendObserveRecord(env, codexRecord);
+
+      // Now Clients section MUST appear because known client Codex exists
+      const reportWithCodex = await runStatsCommand([], { env, cwd });
+      expect(reportWithCodex).toContain("Compressed          2 times");
+      expect(reportWithCodex).toContain("Clients");
+      expect(reportWithCodex).toContain("Codex");
+      expect(reportWithCodex).toContain("Unknown");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

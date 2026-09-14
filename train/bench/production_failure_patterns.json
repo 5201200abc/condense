@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "order": 1,
+      "id": "mixed_pass_fail",
+      "status": "confirmed",
+      "scope": {
+        "project": "transit",
+        "model": "v2",
+        "observedCompressions": 10,
+        "confirmedBadSummaries": 2,
+        "confirmedBadSummaryRate": 0.2
+      },
+      "evidence": [
+        "61138a1fcc184129",
+        "8c15ad973304453d"
+      ],
+      "conclusion": "transit: confirmed bad-summary rate = 2/10 (20%), failure pattern = mixed PASS/FAIL",
+      "acceptanceRule": "If the source contains an explicit failed test or `error: test failed`, the final verdict must be FAIL and must never be PASS.",
+      "qualityGate": "v2",
+      "nextDecision": "Continue observing stats across projects. If the pattern repeats, choose between a deterministic runtime guard and making it the primary v3 training target.",
+      "doesNotTriggerV3": true
+    }
+  ]
+}

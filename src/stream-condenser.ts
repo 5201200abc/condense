@@ -21,7 +21,9 @@ import { randomUUID } from "node:crypto";
 import type { CompletionTimings } from "./llm";
 import {
   appendObserveRecord,
-  buildObserveRecord
+  buildObserveRecord,
+  detectClient,
+  detectContextWindowTokens
 } from "./observe";
 import { condenseSkipReason, countLines, type CondenseSkipReason } from "./policy";
 import { recordRecallSnapshot } from "./recall";
@@ -29,6 +31,7 @@ import {
   estimateTokens,
   formatSingleRunSummary,
   recordCondenseRun,
+  resolveStatsProjectPath,
   type SingleRunStat
 } from "./stats";
 
@@ -221,7 +224,8 @@ export class CondenseSession {
         requestId,
         rawInput,
         normalizedInput,
-        output
+        output,
+        durationMs
       );
       await this.captureStatsRecord(
         rawInput,
@@ -272,11 +276,17 @@ export class CondenseSession {
     requestId: string,
     rawInput: string,
     modelInput: string,
-    output: string
+    output: string,
+    latencyMs: number
   ): Promise<string[] | undefined> {
     if (!this.runtimeConfig || output === rawInput) {
       return undefined;
     }
+
+    const client = detectClient(this.env);
+    const model = this.runtimeConfig.model || "v2";
+    const contextWindowTokens = detectContextWindowTokens(this.env, client);
+    const projectPath = resolveStatsProjectPath(this.cwd);
 
     const record = buildObserveRecord({
       requestId,
@@ -284,11 +294,13 @@ export class CondenseSession {
       rawInput,
       modelInput,
       output,
-      inputLines: countLines(rawInput)
+      inputLines: countLines(rawInput),
+      client,
+      model,
+      contextWindowTokens,
+      latencyMs,
+      projectPath
     });
-    if (!record) {
-      return undefined;
-    }
 
     try {
       await appendObserveRecord(this.env, record);
