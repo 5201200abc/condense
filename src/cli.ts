@@ -54,6 +54,7 @@ async function readAllStdin(): Promise<string> {
 }
 
 async function run(): Promise<number> {
+  const startedAtMs = Date.now() - process.uptime() * 1000;
   const persisted = await readPersistedConfig(process.env);
   const command = parseCommand(process.argv.slice(2), process.env, persisted, {
     stdinIsTTY: stdinIsTTY()
@@ -237,6 +238,7 @@ async function run(): Promise<number> {
       }
     : undefined;
   const session = new CondenseSession({
+    startedAtMs,
     summarizer: {
       summarizeBatch: (input) =>
         summarizeBatchDetailed(command.config, input, { dslMemory: promptDslMemory }),

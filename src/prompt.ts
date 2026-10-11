@@ -1,3 +1,5 @@
+import { fitEvidenceInput } from "./evidence";
+
 export interface PromptMessages {
   system: string;
   user: string;
@@ -51,16 +53,7 @@ const MAX_INPUT_CHARS = 24000;
 export const LOCAL_MAX_INPUT_CHARS = 8000;
 
 export function fitInput(input: string, maxChars: number = MAX_INPUT_CHARS): string {
-  if (input.length <= maxChars) {
-    return input;
-  }
-
-  const half = Math.floor(maxChars / 2) - 50;
-  const head = input.slice(0, half);
-  const tail = input.slice(-half);
-  const dropped = input.length - head.length - tail.length;
-
-  return `${head}\n... [${dropped} chars truncated] ...\n${tail}`;
+  return fitEvidenceInput(input, maxChars);
 }
 
 export function buildFixedBatchSystemPrompt(): string {

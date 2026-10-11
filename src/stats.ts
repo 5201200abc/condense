@@ -17,6 +17,7 @@ import { hashProjectPath } from "./dsl-memory";
 import { withFileLock } from "./file-lock";
 import { resolveConfigPath } from "./user-config";
 import { INCOMPLETE_FAILURE_DETAILS } from "./text";
+import type { EvidenceQuality } from "./evidence";
 
 export interface SingleRunStat {
   timestamp: string;
@@ -41,6 +42,8 @@ export interface SingleRunStat {
   cacheSavedMs?: number;
   bypass?: CondenseSkipReason;
   suspect?: string[];
+  quality?: EvidenceQuality;
+  endToEndMs?: number;
 }
 
 export interface MetricSummary {
@@ -94,6 +97,8 @@ export interface RecordCondenseRunOptions {
   cacheSavedMs?: number;
   bypass?: CondenseSkipReason;
   suspect?: string[];
+  quality?: EvidenceQuality;
+  endToEndMs?: number;
 }
 
 export interface FormatStatsOptions {
@@ -505,7 +510,9 @@ export async function recordCondenseRun(
         predictedMs: Math.max(0, Math.round(options.predictedMs ?? 0)),
         cacheSavedMs: Math.max(0, Math.round(options.cacheSavedMs ?? 0)),
         bypass: options.bypass,
-        suspect: options.suspect
+        suspect: options.suspect,
+        quality: options.quality,
+        endToEndMs: options.endToEndMs
       };
 
       const stats = await readStatsFile(env, now);
@@ -855,7 +862,9 @@ export function formatStatsReport(
         model: (run as any).model ?? "v2",
         contextWindowTokens: (run as any).contextWindowTokens,
         latencyMs: run.durationMs,
-        projectPath: run.projectPath
+        projectPath: run.projectPath,
+        quality: run.quality,
+        endToEndMs: run.endToEndMs
       });
     }
   } else if (records.length === 0 && stats.totals.calls > 0) {
@@ -929,7 +938,8 @@ export function formatStatsReport(
   const legacyRecords = records.filter((r) => !isValidActiveRecord(r));
 
   const compressed = activeRecords.filter(
-    (r) => !r.suspectReasons.includes(INCOMPLETE_FAILURE_DETAILS)
+    (r) => r.quality ? r.quality.action !== "raw" :
+      !(r.suspectReasons.includes(INCOMPLETE_FAILURE_DETAILS) && r.outputChars >= r.inputChars)
   ).length;
   const freedEstimatedTokens = activeRecords.reduce(
     (sum, r) => sum + Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens),
@@ -950,6 +960,28 @@ export function formatStatsReport(
   ).length;
 
   const suspectRecords = activeRecords.filter((r) => r.suspectReasons.length > 0);
+  const assessed = activeRecords.filter((r) => r.quality !== undefined);
+  const modelAssessed = assessed.filter((r) => r.quality!.modelContractPassed !== null);
+  const requiredEvidence = assessed.reduce((sum, r) => sum + r.quality!.required, 0);
+  const retainedEvidence = assessed.reduce((sum, r) => sum + r.quality!.retained, 0);
+  const percentage = (passed: number, total: number) => total ? Number((100 * passed / total).toFixed(2)) : null;
+  const latencies = assessed.filter((r) => r.quality!.contractPassed && r.quality!.action !== "raw")
+    .map((r) => r.endToEndMs).filter(
+    (n): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0
+  ).sort((a, b) => a - b);
+  const qualityMetrics = {
+    assessed: assessed.length,
+    contractPassRate: percentage(assessed.filter((r) => r.quality!.contractPassed).length, assessed.length),
+    modelContractPassRate: percentage(modelAssessed.filter((r) => r.quality!.modelContractPassed).length, modelAssessed.length),
+    criticalEvidenceRecall: percentage(retainedEvidence, requiredEvidence),
+    effectiveTokensSaved: assessed.reduce((sum, r) => sum + (r.quality!.contractPassed && r.quality!.action !== "raw"
+      ? Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens) : 0), 0),
+    guardRepairs: assessed.filter((r) => r.quality!.action === "repair").length,
+    rawFallbacks: assessed.filter((r) => r.quality!.action === "raw").length,
+    abandonedTokens: assessed.reduce((sum, r) => sum + (r.quality!.abandonedTokens ?? 0), 0),
+    endToEndP95Ms: latencies.length ? latencies[Math.ceil(latencies.length * 0.95) - 1] : null,
+    latencySamples: latencies.length
+  };
   const suspects = suspectRecords.length;
   const mixedPassFail = activeRecords.filter((r) =>
     r.suspectReasons.includes("mixed_pass_fail")
@@ -1097,6 +1129,7 @@ export function formatStatsReport(
     }
 
     const payload = {
+      quality: qualityMetrics,
       compressed,
       freedEstimatedTokens,
       avgFreedEstimatedTokens,
@@ -1166,6 +1199,19 @@ export function formatStatsReport(
   lines.push(formatStatsRow("  Timeout / no result", timeoutNoResult));
   lines.push(formatStatsRow("  Terraform unsafe", terraformUnsafe));
   lines.push(formatStatsRow("  Dropped error", droppedError));
+  if (assessed.length) {
+    lines.push("");
+    lines.push("Quality · assessed failure/risk contracts");
+    lines.push("------------");
+    lines.push(formatStatsRow("Contract Pass Rate", `${qualityMetrics.contractPassRate}%`));
+    lines.push(formatStatsRow("Model contract pass", qualityMetrics.modelContractPassRate === null ? "unknown" : `${qualityMetrics.modelContractPassRate}%`));
+    lines.push(formatStatsRow("Critical Evidence Recall", qualityMetrics.criticalEvidenceRecall === null ? "unknown" : `${qualityMetrics.criticalEvidenceRecall}%`));
+    lines.push(formatStatsRow("Effective Tokens Saved", formatTokenMetric(qualityMetrics.effectiveTokensSaved)));
+    lines.push(formatStatsRow("Guard repairs", qualityMetrics.guardRepairs));
+    lines.push(formatStatsRow("Raw fallbacks", qualityMetrics.rawFallbacks));
+    lines.push(formatStatsRow("Abandoned savings", formatTokenMetric(qualityMetrics.abandonedTokens)));
+    lines.push(formatStatsRow("End-to-end P95", qualityMetrics.endToEndP95Ms === null ? "unknown" : `${Math.round(qualityMetrics.endToEndP95Ms)} ms`));
+  }
 
   const hasKnownClients = sortedClients.some(([name]) => name !== "Unknown");
   if (hasKnownClients) {

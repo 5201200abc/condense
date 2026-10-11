@@ -281,32 +281,10 @@ describe("cli entrypoint", () => {
         expect(
           instructions.match(/<!-- condense skill: begin -->/g) ?? []
         ).toHaveLength(1);
-        expect(instructions).toContain("Always communicate with the user in `/condense`");
-        expect(instructions).toContain(
-          "Do not return a rewritten/compressed copy of the user's prompt"
-        );
-        expect(instructions).toContain("Keep hidden chain-of-thought private");
-        expect(instructions).toContain("fixed prefixes S/C/D/R/O/N/P");
-        expect(instructions).toContain("task aliases A/B/F/E/V/X/U/DB/CFG/DOC/PERM");
-        expect(instructions).toContain(
-          "Dict: S=state C=context D=action R=risk O=outcome N=no-go P=proof"
-        );
-        expect(instructions).toContain("shortest unambiguous key possible");
-        expect(instructions).toContain(
-          "For every non-interactive, non-TUI shell/tool command, pipe output through `condense`"
-        );
-        expect(instructions).toContain(
-          "Skip `| condense` only when exact raw output is required"
-        );
-        expect(instructions).toContain(
-          'bun test 2>&1 | condense "Did tests pass? Return PASS or FAIL'
-        );
-        expect(instructions).toContain(
-          'git diff | condense "What changed? Return only files changed'
-        );
-        expect(instructions).toContain(
-          'terraform plan 2>&1 | condense "Is this safe? Return SAFE, REVIEW, or UNSAFE'
-        );
+        const managedBlock = instructions.match(/<!-- condense skill: begin -->[\s\S]*?<!-- condense skill: end -->/)![0];
+        expect(managedBlock.length).toBeLessThan(220);
+        expect(managedBlock).not.toMatch(/always|every|CRITICAL|Military|Dict/i);
+        expect(managedBlock).toContain("when a summary serves the task");
       }
     } finally {
       await rm(dir, { recursive: true, force: true });

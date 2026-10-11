@@ -6,6 +6,7 @@ import fixtures from "./fixtures/v2-failure-contract.json";
 import { hasIncompleteFailureDetails, INCOMPLETE_FAILURE_DETAILS } from "../src/text";
 import { fitInput, LOCAL_MAX_INPUT_CHARS } from "../src/prompt";
 import { normalizeForModel } from "../src/text";
+import { extractCriticalEvidence, assessEvidence } from "../src/evidence";
 import { CondenseSession } from "../src/stream-condenser";
 import { readObserveRecords } from "../src/observe";
 import { formatStatsReport, readStatsFile } from "../src/stats";
@@ -40,21 +41,40 @@ describe("v2 failure output contract", () => {
         });
         session.push(Buffer.from(fixture.raw_input));
         await session.end();
-        expect(Buffer.concat(chunks).toString()).toBe(fixture.raw_input);
+        const output = Buffer.concat(chunks).toString();
+        const evidence = extractCriticalEvidence(fixture.raw_input);
+        expect(output).toStartWith("FAIL\n");
+        expect(output.length).toBeLessThan(fixture.raw_input.length / 2);
+        expect(assessEvidence(evidence, output)).toBe(evidence.anchors.length);
+        const expectedLocations: Record<string, string> = {
+          "7c350a4b": "mycode-compact-entrypoints.mjs:89:14",
+          "60e3517f": "mycode-composer-details.mjs:311:17",
+          "9d445347": "mycode-capability-settings.mjs:44:53",
+          "e59e3eb7": "mycode-compact-entrypoints.mjs:15:17"
+        };
+        expect(output).toContain(expectedLocations[fixture.request_id.slice(0, 8)]);
         await expect(readFile(path.join(dir, "dataset.jsonl"))).rejects.toThrow();
         const stats = await readStatsFile(env);
         const records = await readObserveRecords(env);
-        expect(stats.totals.savedTokens).toBe(0);
-        expect(stats.totals.savedChars).toBe(0);
+        expect(stats.totals.savedTokens).toBeGreaterThan(0);
+        expect(stats.totals.savedChars).toBeGreaterThan(0);
         expect(stats.totals.suspectCalls).toBe(1);
         expect(records[0].suspectReasons).toEqual([INCOMPLETE_FAILURE_DETAILS]);
-        expect(records[0].output).toBe(fixture.raw_input);
+        expect(records[0].output).toBe(output.trim());
+        expect(records[0].quality?.action).toBe("repair");
         for (const observeRecords of [records, undefined]) {
           const report = JSON.parse(formatStatsReport(stats, { json: true, observeRecords }));
-          expect(report.compressed).toBe(0);
-          expect(report.freedEstimatedTokens).toBe(0);
+          expect(report.compressed).toBe(1);
+          expect(report.freedEstimatedTokens).toBeGreaterThan(0);
           expect(report.suspects).toBe(1);
           expect(report.suspectReasons.droppedError).toBe(1);
+          expect(report.quality.contractPassRate).toBe(100);
+          expect(report.quality.modelContractPassRate).toBe(0);
+          expect(report.quality.criticalEvidenceRecall).toBe(100);
+          expect(report.quality.guardRepairs).toBe(1);
+          expect(report.quality.effectiveTokensSaved).toBe(report.freedEstimatedTokens);
+          expect(report.quality.abandonedTokens).toBeGreaterThan(0);
+          expect(report.quality.endToEndP95Ms).toBeGreaterThan(0);
         }
       } finally {
         await rm(dir, { recursive: true, force: true });

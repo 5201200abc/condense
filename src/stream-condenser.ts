@@ -13,7 +13,6 @@ import {
   ensureTrailingNewline,
   hasPromptLikeTail,
   hasRedrawSignal,
-  hasIncompleteFailureDetails,
   INCOMPLETE_FAILURE_DETAILS,
   looksLikeBadDistillation,
   normalizeForModel,
@@ -36,6 +35,7 @@ import {
   resolveStatsProjectPath,
   type SingleRunStat
 } from "./stats";
+import { enforceEvidenceContract, EvidenceBudgetExceeded, type EvidenceQuality } from "./evidence";
 
 type Mode = "undecided" | "watch" | "interactive";
 export type ProgressPhase = "collecting" | "summarizing";
@@ -44,6 +44,7 @@ interface Burst {
   id: number;
   raw: string;
   normalized: string;
+  startedAtMs: number;
 }
 
 const PROGRESS_FRAMES = ["-", "\\", "|", "/"];
@@ -81,12 +82,14 @@ export interface CondenseSessionOptions {
   env?: NodeJS.ProcessEnv;
   cwd?: string;
   applySkipPolicy?: boolean;
+  startedAtMs?: number;
 }
 
 export class CondenseSession {
   private readonly env: NodeJS.ProcessEnv;
   private readonly cwd: string;
   private readonly applySkipPolicy: boolean;
+  private readonly startedAtMs: number;
   private readonly summarizer: Summarizer;
   private readonly runtimeConfig: RuntimeConfig | null;
   private readonly dataset: DatasetAppendConfig | null;
@@ -104,6 +107,7 @@ export class CondenseSession {
   private readonly rawBuffers: Buffer[] = [];
   private readonly completedBursts: Burst[] = [];
   private currentBurstBuffers: Buffer[] = [];
+  private currentBurstStartedAtMs: number | null = null;
   private mode: Mode = "undecided";
   private progressPhase: ProgressPhase = "collecting";
   private sawRedraw = false;
@@ -121,6 +125,7 @@ export class CondenseSession {
 
   constructor(options: CondenseSessionOptions) {
     this.env = options.env ?? process.env;
+    this.startedAtMs = options.startedAtMs ?? Date.now();
     this.cwd = options.cwd ?? process.cwd();
     this.applySkipPolicy = options.applySkipPolicy ?? false;
     this.summarizer = options.summarizer;
@@ -155,6 +160,7 @@ export class CondenseSession {
       this.rawBuffers.push(chunk);
     }
 
+    this.currentBurstStartedAtMs ??= Date.now();
     this.currentBurstBuffers.push(chunk);
     this.sawRedraw ||= hasRedrawSignal(chunk.toString("utf8"));
 
@@ -209,12 +215,15 @@ export class CondenseSession {
       const timings =
         typeof batchResult === "string" ? undefined : batchResult.timings;
 
-      if (hasIncompleteFailureDetails(normalizedInput, summary, this.runtimeConfig?.question)) {
+      const contract = enforceEvidenceContract(rawInput, summary, this.runtimeConfig?.question);
+      if (contract.quality) contract.quality.abandonedTokens = Math.max(0, estimateTokens(contract.output) - estimateTokens(summary));
+      if (contract.quality && contract.quality.action !== "none") {
         this.stopProgress(true);
-        this.stdout.write(Buffer.concat(this.rawBuffers));
-        await this.captureRecallRecord(requestId, rawInput, rawInput);
-        await this.captureObserveRecord(requestId, rawInput, normalizedInput, rawInput, durationMs, [INCOMPLETE_FAILURE_DETAILS]);
-        await this.captureStatsRecord(rawInput, rawInput, durationMs, timings, undefined, [INCOMPLETE_FAILURE_DETAILS]);
+        const output = contract.output;
+        this.stdout.write(contract.quality.action === "raw" ? Buffer.concat(this.rawBuffers) : ensureTrailingNewline(output));
+        await this.captureRecallRecord(requestId, rawInput, output);
+        await this.captureObserveRecord(requestId, rawInput, normalizedInput, output, durationMs, [INCOMPLETE_FAILURE_DETAILS], contract.quality);
+        await this.captureStatsRecord(rawInput, output, durationMs, timings, undefined, [INCOMPLETE_FAILURE_DETAILS], contract.quality);
         return;
       }
 
@@ -236,7 +245,9 @@ export class CondenseSession {
         rawInput,
         normalizedInput,
         output,
-        durationMs
+        durationMs,
+        undefined,
+        contract.quality
       );
       await this.captureStatsRecord(
         rawInput,
@@ -244,10 +255,24 @@ export class CondenseSession {
         durationMs,
         timings,
         undefined,
-        suspect
+        suspect,
+        contract.quality
       );
-    } catch {
+    } catch (error) {
       this.stopProgress(true);
+      if (error instanceof EvidenceBudgetExceeded) {
+        const contract = enforceEvidenceContract(rawInput, "", this.runtimeConfig?.question);
+        if (contract.quality) {
+          contract.quality.modelContractPassed = null;
+          const output = contract.output;
+          const durationMs = Date.now() - summarizeStartedAt;
+          this.stdout.write(contract.quality.action === "raw" ? Buffer.concat(this.rawBuffers) : ensureTrailingNewline(output));
+          await this.captureRecallRecord(requestId, rawInput, output);
+          await this.captureObserveRecord(requestId, rawInput, normalizedInput, output, durationMs, ["evidence_budget_exceeded"], contract.quality);
+          await this.captureStatsRecord(rawInput, output, durationMs, undefined, undefined, ["evidence_budget_exceeded"], contract.quality);
+          return;
+        }
+      }
       this.stdout.write(Buffer.concat(this.rawBuffers));
       await this.captureStatsRecord(
         rawInput,
@@ -289,7 +314,9 @@ export class CondenseSession {
     modelInput: string,
     output: string,
     latencyMs: number,
-    rejectedReasons?: string[]
+    rejectedReasons?: string[],
+    quality?: EvidenceQuality,
+    startedAtMs = this.startedAtMs
   ): Promise<string[] | undefined> {
     if (!this.runtimeConfig || (output === rawInput && !rejectedReasons)) {
       return undefined;
@@ -318,6 +345,8 @@ export class CondenseSession {
       record.suspectReasons = rejectedReasons;
       if (!record.kinds.includes("suspect")) record.kinds.push("suspect");
     }
+    if (quality) record.quality = quality;
+    record.endToEndMs = Math.max(0, Date.now() - startedAtMs);
 
     try {
       await appendObserveRecord(this.env, record);
@@ -333,7 +362,9 @@ export class CondenseSession {
     durationMs: number,
     timings?: CompletionTimings,
     bypass?: CondenseSkipReason,
-    suspect?: string[]
+    suspect?: string[],
+    quality?: EvidenceQuality,
+    startedAtMs = this.startedAtMs
   ): Promise<SingleRunStat | undefined> {
     if (!this.runtimeConfig) {
       return undefined;
@@ -346,13 +377,15 @@ export class CondenseSession {
         rawInput,
         output,
         durationMs,
+        endToEndMs: Math.max(0, Date.now() - startedAtMs),
         cacheN: timings?.cacheN,
         promptN: timings?.promptN,
         promptMs: timings?.promptMs,
         predictedMs: timings?.predictedMs,
         cacheSavedMs: timings?.cacheSavedMs,
         bypass,
-        suspect
+        suspect,
+        quality
       });
 
       if (this.onBatchStat) {
@@ -576,8 +609,10 @@ export class CondenseSession {
     this.completedBursts.push({
       id: this.nextBurstId,
       raw,
-      normalized: normalizeForModel(raw)
+      normalized: normalizeForModel(raw),
+      startedAtMs: this.currentBurstStartedAtMs ?? Date.now()
     });
+    this.currentBurstStartedAtMs = null;
     this.nextBurstId += 1;
   }
 
@@ -627,10 +662,14 @@ export class CondenseSession {
         );
         const durationMs = Date.now() - startedAt;
 
-        if (hasIncompleteFailureDetails(current.normalized, summary, this.runtimeConfig?.question)) {
-          this.renderWatchFallback(current.raw);
-          await this.captureObserveRecord(randomUUID().replace(/-/g, "").slice(0, 16), current.raw, current.normalized, current.raw, durationMs, [INCOMPLETE_FAILURE_DETAILS]);
-          await this.captureStatsRecord(current.raw, current.raw, durationMs, undefined, undefined, [INCOMPLETE_FAILURE_DETAILS]);
+        const contract = enforceEvidenceContract(current.raw, summary, this.runtimeConfig?.question);
+        if (contract.quality) contract.quality.abandonedTokens = Math.max(0, estimateTokens(contract.output) - estimateTokens(summary));
+        if (contract.quality && contract.quality.action !== "none") {
+          if (contract.quality.action === "raw") this.renderWatchFallback(current.raw);
+          else this.renderWatchSummary(contract.output);
+          await this.captureObserveRecord(randomUUID().replace(/-/g, "").slice(0, 16), current.raw, current.normalized, contract.output, durationMs, [INCOMPLETE_FAILURE_DETAILS], contract.quality, current.startedAtMs);
+          await this.captureStatsRecord(current.raw, contract.output, durationMs, undefined, undefined, [INCOMPLETE_FAILURE_DETAILS], contract.quality, current.startedAtMs);
+          this.trimWatchHistory();
           return;
         }
 
@@ -642,9 +681,23 @@ export class CondenseSession {
 
         const output = summary.trim();
         this.renderWatchSummary(output);
-        await this.captureStatsRecord(current.raw, output, durationMs);
+        await this.captureObserveRecord(randomUUID().replace(/-/g, "").slice(0, 16), current.raw, current.normalized, output, durationMs, undefined, contract.quality, current.startedAtMs);
+        await this.captureStatsRecord(current.raw, output, durationMs, undefined, undefined, undefined, contract.quality, current.startedAtMs);
         this.trimWatchHistory();
-      } catch {
+      } catch (error) {
+        if (error instanceof EvidenceBudgetExceeded) {
+          const contract = enforceEvidenceContract(current.raw, "", this.runtimeConfig?.question);
+          if (contract.quality) {
+            contract.quality.modelContractPassed = null;
+            if (contract.quality.action === "raw") this.renderWatchFallback(current.raw);
+            else this.renderWatchSummary(contract.output);
+            const durationMs = Date.now() - startedAt;
+            await this.captureObserveRecord(randomUUID().replace(/-/g, "").slice(0, 16), current.raw, current.normalized, contract.output, durationMs, ["evidence_budget_exceeded"], contract.quality, current.startedAtMs);
+            await this.captureStatsRecord(current.raw, contract.output, durationMs, undefined, undefined, ["evidence_budget_exceeded"], contract.quality, current.startedAtMs);
+            this.trimWatchHistory();
+            return;
+          }
+        }
         this.renderWatchFallback(current.raw);
         await this.captureStatsRecord(
           current.raw,

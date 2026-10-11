@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { CondenseSession } from "../src/stream-condenser";
+import { EvidenceBudgetExceeded } from "../src/evidence";
+import type { SingleRunStat } from "../src/stats";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -438,6 +440,42 @@ describe("CondenseSession", () => {
     expect(writer.read()).toBe("failure count changed\n");
     expect(watchCalls).toBe(1);
   });
+
+  for (const oversized of [false, true]) {
+    it(`preserves watch evidence and measures each cycle${oversized ? " when the model budget is exceeded" : ""}`, async () => {
+      const writer = createWriter();
+      const records: SingleRunStat[] = [];
+      const session = new CondenseSession({
+        stdout: writer, isTTY: false, idleMs: 15, interactiveGapMs: 5,
+        startedAtMs: Date.now() - 3_600_000,
+        runtimeConfig: {
+          question: "PASS or FAIL? List failing items with raw errors.",
+          model: "v2", host: "http://localhost:8009/v1", apiKey: "", timeoutMs: 1000
+        },
+        onBatchStat: (stat) => { records.push(stat); },
+        summarizer: {
+          summarizeBatch: async () => "unused",
+          summarizeWatch: async () => {
+            if (oversized) throw new EvidenceBudgetExceeded();
+            return "FAIL";
+          }
+        }
+      });
+      const input = "watch healthy iteration\n".repeat(200) + "FAIL test/payment.test.ts\nTypeError: bad payment\n    at run (/app/payment.ts:87:12)\n";
+      session.push(Buffer.from(input));
+      await sleep(25);
+      session.push(Buffer.from(input));
+      await sleep(40);
+      await session.end();
+      expect(writer.read()).toContain("TypeError: bad payment");
+      expect(writer.read()).toContain("/app/payment.ts:87:12");
+      expect(writer.read().length).toBeLessThan(input.length / 2);
+      expect(records).toHaveLength(1);
+      expect(records[0].quality?.action).toBe("repair");
+      expect(records[0].quality?.modelContractPassed).toBe(oversized ? null : false);
+      expect(records[0].endToEndMs).toBeLessThan(1000);
+    });
+  }
 
   it("clears the terminal when rendering watch output on a tty", async () => {
     const writer = createWriter();

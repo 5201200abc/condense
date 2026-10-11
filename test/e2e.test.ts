@@ -20,6 +20,7 @@ import { createScriptCommand } from "./script-command";
 import failureContractFixtures from "./fixtures/v2-failure-contract.json";
 import { readObserveRecords } from "../src/observe";
 import { formatStatsReport, readStatsFile } from "../src/stats";
+import { extractCriticalEvidence, assessEvidence } from "../src/evidence";
 
 setDefaultTimeout(process.platform === "win32" ? 120_000 : 60_000);
 
@@ -292,13 +293,16 @@ describe("condense end-to-end", () => {
           inputSteps: [{ data: fixture.raw_input }]
         });
         expect(result.code).toBe(0);
-        expect(result.stdout).toBe(fixture.raw_input);
+        expect(result.stdout).toStartWith("FAIL\n");
+        expect(result.stdout.length).toBeLessThan(fixture.raw_input.length / 2);
+        const evidence = extractCriticalEvidence(fixture.raw_input);
+        expect(assessEvidence(evidence, result.stdout)).toBe(evidence.anchors.length);
         expect(fake.requests).toHaveLength(1);
         const stats = await readStatsFile(env);
         const records = await readObserveRecords(env);
         const report = JSON.parse(formatStatsReport(stats, { json: true, observeRecords: records }));
-        expect(report.compressed).toBe(0);
-        expect(report.freedEstimatedTokens).toBe(0);
+        expect(report.compressed).toBe(1);
+        expect(report.freedEstimatedTokens).toBeGreaterThan(0);
         expect(report.suspectReasons.droppedError).toBe(1);
       } finally {
         fake.stop();

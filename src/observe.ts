@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { isLongLog, isOverflowRisk } from "./policy";
 import { estimateTokens } from "./stats";
+import type { EvidenceQuality } from "./evidence";
 import { resolveConfigPath } from "./user-config";
 
 export type ObserveKind = "long" | "overflow" | "suspect";
@@ -26,6 +27,8 @@ export interface ObserveRecord {
   contextWindowTokens?: number;
   latencyMs: number;
   projectPath?: string;
+  quality?: EvidenceQuality;
+  endToEndMs?: number;
 }
 
 export function resolveObservePath(env: NodeJS.ProcessEnv): string {
@@ -310,7 +313,9 @@ export async function readObserveRecords(
           model: item.model ?? "v2",
           contextWindowTokens: item.contextWindowTokens,
           latencyMs: item.latencyMs ?? 0,
-          projectPath: item.projectPath
+          projectPath: item.projectPath,
+          quality: item.quality,
+          endToEndMs: item.endToEndMs
         });
       } catch {
         // Skip malformed entries
