@@ -619,12 +619,12 @@ describe("condense end-to-end", () => {
     ]);
 
     try {
-      runOrThrow(
+      const result = await runProcess(
         scriptCommand.command,
         scriptCommand.args,
-        root,
-        createProviderEnv(fake.host)
+        { cwd: root, env: createProviderEnv(fake.host) }
       );
+      expect(result.code).toBe(0);
 
       const output = normalizePtyOutput(await readFile(capturePath, "utf8"));
       const lines = output.split("\n");

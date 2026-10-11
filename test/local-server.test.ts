@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -118,6 +118,20 @@ describe("local server backend selection", () => {
 });
 
 describe("ensureLocalServer", () => {
+  let modelDir: string;
+  let modelEnv: NodeJS.ProcessEnv;
+
+  beforeEach(async () => {
+    modelDir = await mkdtemp(path.join(tmpdir(), "condense-server-model-"));
+    const modelPath = path.join(modelDir, "fixture.gguf");
+    await writeFile(modelPath, "GGUF test fixture; backend spawn is mocked");
+    modelEnv = { CONDENSE_LLAMA_GGUF: modelPath };
+  });
+
+  afterEach(async () => {
+    await rm(modelDir, { recursive: true, force: true });
+  });
+
   it("reuses an already compatible local server instead of spawning another one", async () => {
     const events: string[] = [];
 
@@ -145,6 +159,7 @@ describe("ensureLocalServer", () => {
     let probeCount = 0;
 
     await ensureLocalServer(localConfig({ localBackend: "llamacpp" }), {
+      env: modelEnv,
       platform: "linux",
       arch: "x64",
       probeServer: async () => {
@@ -189,6 +204,7 @@ describe("ensureLocalServer", () => {
     let probeCount = 0;
 
     await ensureLocalServer(localConfig(), {
+      env: modelEnv,
       platform: "darwin",
       arch: "arm64",
       probeServer: async () => {
@@ -224,6 +240,7 @@ describe("ensureLocalServer", () => {
     let probeCount = 0;
 
     await ensureLocalServer(localConfig({ localBackend: "llamacpp" }), {
+      env: modelEnv,
       platform: "darwin",
       arch: "arm64",
       probeServer: async () => {
