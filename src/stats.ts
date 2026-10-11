@@ -16,6 +16,7 @@ import { isLongLog, isOverflowRisk, type CondenseSkipReason } from "./policy";
 import { hashProjectPath } from "./dsl-memory";
 import { withFileLock } from "./file-lock";
 import { resolveConfigPath } from "./user-config";
+import { INCOMPLETE_FAILURE_DETAILS } from "./text";
 
 export interface SingleRunStat {
   timestamp: string;
@@ -927,7 +928,9 @@ export function formatStatsReport(
   const activeRecords = records.filter(isValidActiveRecord);
   const legacyRecords = records.filter((r) => !isValidActiveRecord(r));
 
-  const compressed = activeRecords.length;
+  const compressed = activeRecords.filter(
+    (r) => !r.suspectReasons.includes(INCOMPLETE_FAILURE_DETAILS)
+  ).length;
   const freedEstimatedTokens = activeRecords.reduce(
     (sum, r) => sum + Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens),
     0
@@ -960,7 +963,8 @@ export function formatStatsReport(
   const droppedError = activeRecords.filter(
     (r) =>
       r.suspectReasons.includes("missed_fail") ||
-      r.suspectReasons.includes("missed_critical")
+      r.suspectReasons.includes("missed_critical") ||
+      r.suspectReasons.includes(INCOMPLETE_FAILURE_DETAILS)
   ).length;
 
   const clientCounts: Record<string, number> = {};
@@ -1055,8 +1059,8 @@ export function formatStatsReport(
     }
 
     const avgDurationMs =
-      compressed > 0
-        ? Math.round(activeRecords.reduce((sum, r) => sum + r.latencyMs, 0) / compressed)
+      activeRecords.length > 0
+        ? Math.round(activeRecords.reduce((sum, r) => sum + r.latencyMs, 0) / activeRecords.length)
         : 0;
 
     const cacheSample = summarizeCacheSample(stats.totals, stats.recent ?? []);

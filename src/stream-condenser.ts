@@ -13,6 +13,8 @@ import {
   ensureTrailingNewline,
   hasPromptLikeTail,
   hasRedrawSignal,
+  hasIncompleteFailureDetails,
+  INCOMPLETE_FAILURE_DETAILS,
   looksLikeBadDistillation,
   normalizeForModel,
   structuralSimilarity
@@ -207,6 +209,15 @@ export class CondenseSession {
       const timings =
         typeof batchResult === "string" ? undefined : batchResult.timings;
 
+      if (hasIncompleteFailureDetails(normalizedInput, summary, this.runtimeConfig?.question)) {
+        this.stopProgress(true);
+        this.stdout.write(Buffer.concat(this.rawBuffers));
+        await this.captureRecallRecord(requestId, rawInput, rawInput);
+        await this.captureObserveRecord(requestId, rawInput, normalizedInput, rawInput, durationMs, [INCOMPLETE_FAILURE_DETAILS]);
+        await this.captureStatsRecord(rawInput, rawInput, durationMs, timings, undefined, [INCOMPLETE_FAILURE_DETAILS]);
+        return;
+      }
+
       if (looksLikeBadDistillation(normalizedInput, summary)) {
         this.stopProgress(true);
         this.stdout.write(Buffer.concat(this.rawBuffers));
@@ -277,9 +288,10 @@ export class CondenseSession {
     rawInput: string,
     modelInput: string,
     output: string,
-    latencyMs: number
+    latencyMs: number,
+    rejectedReasons?: string[]
   ): Promise<string[] | undefined> {
-    if (!this.runtimeConfig || output === rawInput) {
+    if (!this.runtimeConfig || (output === rawInput && !rejectedReasons)) {
       return undefined;
     }
 
@@ -301,6 +313,11 @@ export class CondenseSession {
       latencyMs,
       projectPath
     });
+
+    if (rejectedReasons) {
+      record.suspectReasons = rejectedReasons;
+      if (!record.kinds.includes("suspect")) record.kinds.push("suspect");
+    }
 
     try {
       await appendObserveRecord(this.env, record);
@@ -609,6 +626,13 @@ export class CondenseSession {
           current.normalized
         );
         const durationMs = Date.now() - startedAt;
+
+        if (hasIncompleteFailureDetails(current.normalized, summary, this.runtimeConfig?.question)) {
+          this.renderWatchFallback(current.raw);
+          await this.captureObserveRecord(randomUUID().replace(/-/g, "").slice(0, 16), current.raw, current.normalized, current.raw, durationMs, [INCOMPLETE_FAILURE_DETAILS]);
+          await this.captureStatsRecord(current.raw, current.raw, durationMs, undefined, undefined, [INCOMPLETE_FAILURE_DETAILS]);
+          return;
+        }
 
         if (looksLikeBadDistillation(current.normalized, summary)) {
           this.renderWatchFallback(current.raw);

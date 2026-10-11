@@ -17,6 +17,9 @@ import {
   getPlatformTarget
 } from "../scripts/platform-targets";
 import { createScriptCommand } from "./script-command";
+import failureContractFixtures from "./fixtures/v2-failure-contract.json";
+import { readObserveRecords } from "../src/observe";
+import { formatStatsReport, readStatsFile } from "../src/stats";
 
 setDefaultTimeout(process.platform === "win32" ? 120_000 : 60_000);
 
@@ -269,6 +272,41 @@ beforeAll(() => {
 });
 
 describe("condense end-to-end", () => {
+  for (const fixture of failureContractFixtures) {
+    it(`preserves failure evidence through the compiled CLI ${fixture.request_id.slice(0, 8)}`, async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), "condense-e2e-contract-"));
+      const env = {
+        CONDENSE_CONFIG_PATH: path.join(dir, "config.json"),
+        CONDENSE_STATS_PATH: path.join(dir, "stats.json"),
+        CONDENSE_OBSERVE_PATH: path.join(dir, "observe.jsonl"),
+        CONDENSE_RECALL_PATH: path.join(dir, "recall.db"),
+        CONDENSE_DATASET_ENABLED: "false"
+      };
+      const fake = await createFakeChatProvider(() => new Response(
+        JSON.stringify({ choices: [{ message: { content: fixture.output } }] }),
+        { status: 200 }
+      ));
+      try {
+        const result = await runLauncher([fixture.question], {
+          env: createProviderEnv(fake.host, env),
+          inputSteps: [{ data: fixture.raw_input }]
+        });
+        expect(result.code).toBe(0);
+        expect(result.stdout).toBe(fixture.raw_input);
+        expect(fake.requests).toHaveLength(1);
+        const stats = await readStatsFile(env);
+        const records = await readObserveRecords(env);
+        const report = JSON.parse(formatStatsReport(stats, { json: true, observeRecords: records }));
+        expect(report.compressed).toBe(0);
+        expect(report.freedEstimatedTokens).toBe(0);
+        expect(report.suspectReasons.droppedError).toBe(1);
+      } finally {
+        fake.stop();
+        await rm(dir, { recursive: true, force: true });
+      }
+    });
+  }
+
   it("summarizes batch output through the launcher", async () => {
     const fake = await createFakeChatProvider((_body, _index) =>
       new Response(

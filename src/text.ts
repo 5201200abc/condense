@@ -5,6 +5,24 @@ const ANSI_PATTERN =
 const PROMPT_PATTERN =
   /(?:\[[Yy]\/[Nn]\]|\[[Nn]\/[Yy]\]|\([Yy]\/[Nn]\)|\([Nn]\/[Yy]\)|password:|passphrase:|continue\?|proceed\?)\s*$/i;
 
+export const INCOMPLETE_FAILURE_DETAILS = "incomplete_failure_details";
+
+export function hasIncompleteFailureDetails(
+  input: string,
+  output: string,
+  question?: string
+): boolean {
+  if (!question || !/^FAIL\s*[.!]?$/i.test(output.trim())) return false;
+  const requestsDetails =
+    /\b(?:failing|failed|failure)\s+(?:items?|tests?|cases?|commands?|details?)\b|\b(?:raw|original)\s+(?:error|failure)|\b(?:list|include|show|report|provide)\b[^\n?]*\b(?:errors?|failures?)\b|失败项|原始错误|错误详情|列出.*(?:错误|失败)/i.test(question);
+  if (!requestsDetails) return false;
+  const source = normalizeForModel(input)
+    .split("\n")
+    .filter((line) => !/\[console\.warn\]|^\s*(?:\[[^\]\n]+\]\s*)?(?:warn(?:ing)?\b)/i.test(line))
+    .join("\n");
+  return /\blocator\.\w+: Timeout \d+ms exceeded\b|\bTimeoutError\b|^\s*(?:\w*Error|\w*Exception)(?:\s*\[[^\]\n]+\])?:[^\n]*\n\s+at\s+\S|^.*\[(?:Unhandled error|console\.error)\]\s+(?:\w*Error|\w*Exception):/m.test(source);
+}
+
 export function normalizeForModel(input: string): string {
   return input
     .replace(/\r\n/g, "\n")

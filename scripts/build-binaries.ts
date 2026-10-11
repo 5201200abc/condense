@@ -36,4 +36,18 @@ for (const target of selectedTargets) {
   if (result.status !== 0) {
     throw new Error(`Failed to compile ${target.bunTarget}.`);
   }
+
+  // Bun's compiled Mach-O may retain a signature invalidated by bundling.
+  // Repair it before copying or executing the artifact on macOS.
+  if (process.platform === "darwin" && target.os.includes("darwin")) {
+    for (const args of [
+      ["--force", "--sign", "-", outfile],
+      ["--verify", "--verbose=4", outfile]
+    ]) {
+      const signing = spawnSync("codesign", args, { stdio: "inherit" });
+      if (signing.status !== 0) {
+        throw new Error(`Failed to sign or verify ${target.bunTarget}.`);
+      }
+    }
+  }
 }
