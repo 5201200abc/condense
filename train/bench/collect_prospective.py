@@ -51,9 +51,14 @@ def main():
     ):
         raise ValueError("Register sources after the freeze and before collection")
     window = roster.get("collection_window", {})
-    if not window.get("start") or not window.get("end") or not roster.get("selection_rule"):
+    end_condition = window.get("end_condition")
+    if not window.get("start") or not roster.get("selection_rule") or not (
+        window.get("end") or (isinstance(end_condition, str) and end_condition.strip())
+    ):
         raise ValueError("Preregister a collection window and selection rule")
-    if not (instant(roster["registered_at"]) <= instant(window["start"]) <= instant(started_at) < instant(window["end"])):
+    if not (instant(roster["registered_at"]) <= instant(window["start"]) <= instant(started_at)) or (
+        window.get("end") and instant(started_at) >= instant(window["end"])
+    ):
         raise ValueError("Collection must be inside the preregistered time window")
     sources = roster.get("sources", [])
     identifiers = [s["id"] for s in sources]
@@ -77,6 +82,8 @@ def main():
     if any(output.is_relative_to(path) for path in (root, project, Path.home() / ".config/condense")):
         raise ValueError("Keep blind data outside repositories and production Condense data")
     output.mkdir(parents=True, exist_ok=True)
+    if (output / "completion.json").exists():
+        raise ValueError("Evaluation completed; the collection window is closed")
     registration = {
         "evaluation_id": freeze["evaluation_id"], "sources_sha256": hashlib.sha256(roster_bytes).hexdigest(),
         "freeze_sha256": digest(freeze_path), "protocol_sha256": digest(protocol_path),
@@ -91,15 +98,15 @@ def main():
         with registration_path.open("x") as stream:
             json.dump(registration, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
+    env = dict(os.environ)
+    env.update(source.get("environment", {}))
+    started_at = timestamp()
+    if (window.get("end") and instant(started_at) >= instant(window["end"])) or (output / "completion.json").exists():
+        raise ValueError("Collection window ended before command startup")
     sample_id = uuid.uuid4().hex
     sample = output / sample_id
     sample.mkdir()
     raw_path = sample / "raw.log"
-    env = dict(os.environ)
-    env.update(source.get("environment", {}))
-    started_at = timestamp()
-    if instant(started_at) >= instant(window["end"]):
-        raise ValueError("Collection window ended before command startup")
     start_ns = time.time_ns()
     start = time.monotonic()
     # stdout and stderr share one native byte stream, equivalent to 2>&1.

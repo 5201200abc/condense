@@ -16,7 +16,7 @@ Guard、8K 预算或压缩逻辑，不训练 v3，不发布 npm。
 - 首轮盲测仅接纳冻结与来源登记之后采集的真实工作负载，且独立性审核通过。
 
 在执行第一条采集命令之前登记项目目录、真实命令 argv、原始问题、报告
-路径、必要环境变量、采集时间窗口和运行选择规则。固定窗口内连续纳入
+路径、必要环境变量、采集时间窗口和运行选择规则。登记窗口内连续纳入
 清单中真实工作的每次运行；不根据 Condense 输出选择样本，不制造错误
 凑覆盖，不重复执行同一输入充数。时间窗口或来源更改需要新采集轮次。
 
@@ -33,7 +33,11 @@ Guard、8K 预算或压缩逻辑，不训练 v3，不发布 npm。
 {
   "evaluation_id": "prospective-production-22b5fa1-round1",
   "registered_at": "采集前的 UTC ISO-8601 时间",
-  "collection_window": {"start": "UTC 时间", "end": "UTC 时间"},
+  "collection_window": {
+    "start": "UTC 时间",
+    "end": null,
+    "end_condition": "首轮测试完成后关闭；至少 50 条有效样本且覆盖六类，独立标注封存后一次性评测"
+  },
   "selection_rule": "窗口内连续采集已登记真实工作负载的所有运行",
   "sources": [{
     "id": "可追溯的来源 ID",
@@ -54,12 +58,22 @@ Guard、8K 预算或压缩逻辑，不训练 v3，不发布 npm。
 
 `/Users/mfordjody/other/mycode` 已不存在；在已检查范围内未找到 RTK
 或 videos-workflow 项目目录。发现的 Caveman 是 Claude 插件目录中的
-上游仓库，并非所列 fork，暂不替代登记。app2me 保持本轮来源选择中的
-排除状态，Condense 仅用于辅助回归。
+上游仓库，并非所列 fork，暂不替代登记。用户确认 mycode 已更名为
+app2me；当前目录为 `/Users/mfordjody/other/app2me`，与 Lumen 一起登记。
+app2me 的 `lint`、`typecheck`、`build` 脚本及根目录依赖已核实；通过
+`mise exec -- pnpm run <脚本>` 使用项目指定的 Node 24.14.0、pnpm 10.33.2。
+工作区存在用户未提交的变更；来源核实不执行上述工作命令，不计作样本。
+Condense 仅用于辅助回归。
 
-本机 `sources.json` 已填入 `lumen-build` 草案；registered_at 和时间
-窗口仍为 null，正式预注册及采集尚未开始。目录与依赖核实记录不计作
-盲测样本，实际执行能力需在日常工作触发该命令时留存真实结果。
+本机 `sources.json` 登记 `app2me-lint`、`app2me-typecheck`、`app2me-build`
+及 `lumen-build`；登记时间为窗口开始时间，按用户要求在首轮测试完成时
+结束。`end` 为 null 时必须预先填写非空 `end_condition`；固定截止时间
+仍可使用。不得事后改写已封存清单的结束条件或来源。
+
+达到样本数及覆盖后，封存最早完整前缀并停止为本轮纳入新样本；完成独立
+标注、一次性评测后，在采集目录写入 `completion.json`，记录实际完成时间
+及评测报告 SHA-256。此文件存在即拒绝启动新采集。窗口开放不代表自动
+采集已启动，实际工作须通过下述采集命令运行；当前新有效样本仍为 0。
 
 ## 采集与隔离
 

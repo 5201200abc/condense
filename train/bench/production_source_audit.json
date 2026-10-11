@@ -23,7 +23,7 @@
   },
   "inspection_commands_count_as_samples": false,
   "new_eligible_samples": 0,
-  "registration_status": "draft; collection window and registered_at remain null",
+  "registration_status": "registered; starts at registration and ends when first-round test completes",
   "verified_candidate": {
     "id": "lumen-build",
     "project": "/Users/mfordjody/other/lumen",
@@ -84,9 +84,11 @@
           "build"
         ]
       ],
-      "status": "not_found_in_checked_scope",
-      "included": false,
-      "note": "Saved Codex project entry points to the missing historical directory."
+      "status": "renamed_to_app2me_confirmed_by_user",
+      "included": true,
+      "note": "Historical directory is absent; user confirmed the project is now app2me. One project identity, not two independent sources.",
+      "current_path": "/Users/mfordjody/other/app2me",
+      "registered_as": "app2me"
     },
     {
       "project": "rtk",
@@ -131,9 +133,9 @@
       "path": "/Users/mfordjody/other/app2me",
       "repository": "https://github.com/5201200abc/app2me",
       "legacy_remote": "https://github.com/5201200abc/mycode",
-      "status": "excluded_by_round1_source_selection",
-      "included": false,
-      "note": "A legacy-mycode remote alone does not establish that the missing mycode directory moved here."
+      "status": "registered_primary_source",
+      "included": true,
+      "note": "User confirmed the rename; scripts, root dependencies and pinned Node/pnpm verified. Real workflow commands were not executed during inspection."
     },
     {
       "project": "condense",
@@ -143,5 +145,164 @@
       "included_in_primary_blind_roster": false
     }
   ],
-  "next_requirement": "Specify a collection window; then seal the source roster before the first naturally required build. No builds or tests were launched during this source inspection."
+  "next_requirement": "Capture naturally required registered commands; independently audit and label new logs before one frozen evaluation. No quota-filling builds or tests.",
+  "additional_verified_candidates": [
+    {
+      "id": "app2me-lint",
+      "project": "/Users/mfordjody/other/app2me",
+      "argv": [
+        "mise",
+        "exec",
+        "--",
+        "pnpm",
+        "run",
+        "lint"
+      ],
+      "question": "PASS or FAIL? List failing items with their relevant raw error messages. Otherwise report the successful result.",
+      "reports": [],
+      "environment": {},
+      "role": "primary",
+      "verification": {
+        "verified_at": "2026-10-11T17:28:37.529787Z",
+        "repository": "https://github.com/5201200abc/app2me",
+        "legacy_repository": "https://github.com/5201200abc/mycode",
+        "identity_basis": "User confirmed mycode is now app2me; both Git remotes verified",
+        "commit_at_verification": "db454ab72f82d9ffdccb559bb684d041b26f460d",
+        "working_tree": "contains user uncommitted changes; preserved",
+        "files_sha256": {
+          "package.json": "7665e2e92e2eb940752bb008fabaf426845e3c799b64d50d39bbd599f17e2d4d",
+          "pnpm-lock.yaml": "8126403090f122aabba486f6739d810c6b3702da9e96d533807825ff8b2a8d77",
+          "pnpm-workspace.yaml": "391175a4a90e820d51ae4e0cf8c16accf827f4c057b0d64fd9aec3d74ba6d30e",
+          "mise.toml": "3b3f7ee1d377dee8e1186b81975f9b840fc1b1c5923ac82919b1c508f95c5f9f"
+        },
+        "shell_node_version": "v25.6.1",
+        "producer_node_version": "v24.14.0",
+        "pnpm_version": "10.33.2",
+        "dependency_check": {
+          "command": [
+            "rtk",
+            "pnpm",
+            "list",
+            "--depth",
+            "0"
+          ],
+          "exit_code": 0,
+          "scope": "installed root dependencies only; recursive builds not executed"
+        },
+        "workflow_definition_verified": true,
+        "command_execution": "not_run; awaiting real daily work triggers",
+        "script": "oxlint"
+      }
+    },
+    {
+      "id": "app2me-typecheck",
+      "project": "/Users/mfordjody/other/app2me",
+      "argv": [
+        "mise",
+        "exec",
+        "--",
+        "pnpm",
+        "run",
+        "typecheck"
+      ],
+      "question": "PASS or FAIL? List failing items with their relevant raw error messages. Otherwise report the successful result.",
+      "reports": [],
+      "environment": {},
+      "role": "primary",
+      "verification": {
+        "verified_at": "2026-10-11T17:28:37.529787Z",
+        "repository": "https://github.com/5201200abc/app2me",
+        "legacy_repository": "https://github.com/5201200abc/mycode",
+        "identity_basis": "User confirmed mycode is now app2me; both Git remotes verified",
+        "commit_at_verification": "db454ab72f82d9ffdccb559bb684d041b26f460d",
+        "working_tree": "contains user uncommitted changes; preserved",
+        "files_sha256": {
+          "package.json": "7665e2e92e2eb940752bb008fabaf426845e3c799b64d50d39bbd599f17e2d4d",
+          "pnpm-lock.yaml": "8126403090f122aabba486f6739d810c6b3702da9e96d533807825ff8b2a8d77",
+          "pnpm-workspace.yaml": "391175a4a90e820d51ae4e0cf8c16accf827f4c057b0d64fd9aec3d74ba6d30e",
+          "mise.toml": "3b3f7ee1d377dee8e1186b81975f9b840fc1b1c5923ac82919b1c508f95c5f9f"
+        },
+        "shell_node_version": "v25.6.1",
+        "producer_node_version": "v24.14.0",
+        "pnpm_version": "10.33.2",
+        "dependency_check": {
+          "command": [
+            "rtk",
+            "pnpm",
+            "list",
+            "--depth",
+            "0"
+          ],
+          "exit_code": 0,
+          "scope": "installed root dependencies only; recursive builds not executed"
+        },
+        "workflow_definition_verified": true,
+        "command_execution": "not_run; awaiting real daily work triggers",
+        "script": "tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services packages/client packages/server packages/mycode-server-cli packages/ui packages/web packages/desktop/tsconfig.host.json"
+      }
+    },
+    {
+      "id": "app2me-build",
+      "project": "/Users/mfordjody/other/app2me",
+      "argv": [
+        "mise",
+        "exec",
+        "--",
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "question": "PASS or FAIL? List failing items with their relevant raw error messages. Otherwise report the successful result.",
+      "reports": [],
+      "environment": {},
+      "role": "primary",
+      "verification": {
+        "verified_at": "2026-10-11T17:28:37.529787Z",
+        "repository": "https://github.com/5201200abc/app2me",
+        "legacy_repository": "https://github.com/5201200abc/mycode",
+        "identity_basis": "User confirmed mycode is now app2me; both Git remotes verified",
+        "commit_at_verification": "db454ab72f82d9ffdccb559bb684d041b26f460d",
+        "working_tree": "contains user uncommitted changes; preserved",
+        "files_sha256": {
+          "package.json": "7665e2e92e2eb940752bb008fabaf426845e3c799b64d50d39bbd599f17e2d4d",
+          "pnpm-lock.yaml": "8126403090f122aabba486f6739d810c6b3702da9e96d533807825ff8b2a8d77",
+          "pnpm-workspace.yaml": "391175a4a90e820d51ae4e0cf8c16accf827f4c057b0d64fd9aec3d74ba6d30e",
+          "mise.toml": "3b3f7ee1d377dee8e1186b81975f9b840fc1b1c5923ac82919b1c508f95c5f9f"
+        },
+        "shell_node_version": "v25.6.1",
+        "producer_node_version": "v24.14.0",
+        "pnpm_version": "10.33.2",
+        "dependency_check": {
+          "command": [
+            "rtk",
+            "pnpm",
+            "list",
+            "--depth",
+            "0"
+          ],
+          "exit_code": 0,
+          "scope": "installed root dependencies only; recursive builds not executed"
+        },
+        "workflow_definition_verified": true,
+        "command_execution": "not_run; awaiting real daily work triggers",
+        "script": "pnpm -r build"
+      }
+    }
+  ],
+  "registration": {
+    "registered_at": "2026-10-11T17:28:37.529787Z",
+    "collection_window": {
+      "start": "2026-10-11T17:28:37.529787Z",
+      "end": null,
+      "end_condition": "Close after the first-round test is complete: at least 50 valid deduplicated logs covering success, failure, warning-only, mixed outcomes, over-8K output and indeterminate outcomes; independently seal labels and the earliest qualifying cohort before one frozen evaluation."
+    },
+    "source_ids": [
+      "app2me-lint",
+      "app2me-typecheck",
+      "app2me-build",
+      "lumen-build"
+    ],
+    "sources_sha256": "7e2ab8cc122f0dc85496963569cf9453d3553d36a720ebd361ba7a374931e1b7",
+    "new_eligible_samples": 0
+  }
 }
