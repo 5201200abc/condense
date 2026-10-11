@@ -51,3 +51,7 @@ Additional unit cases cover historical references, actual errors followed by
 exit code 0, contradictory statistics, unknown outcomes, and zero tests run;
 conflicting or insufficient evidence does not force PASS or FAIL. These results
 do not establish general reliability on unseen production logs.
+
+The next phase follows [the prospective production protocol](PRODUCTION_VALIDATION.md).
+Its runtime object remains frozen at `22b5fa1`. Historical Recall candidates have
+unknown independence and do not count toward the new 50-sample blind cohort.
