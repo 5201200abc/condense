@@ -222,8 +222,9 @@ export class CondenseSession {
         const output = contract.output;
         this.stdout.write(contract.quality.action === "raw" ? Buffer.concat(this.rawBuffers) : ensureTrailingNewline(output));
         await this.captureRecallRecord(requestId, rawInput, output);
-        await this.captureObserveRecord(requestId, rawInput, normalizedInput, output, durationMs, [INCOMPLETE_FAILURE_DETAILS], contract.quality);
-        await this.captureStatsRecord(rawInput, output, durationMs, timings, undefined, [INCOMPLETE_FAILURE_DETAILS], contract.quality);
+        const reasons = [contract.quality.rejectionReason ?? INCOMPLETE_FAILURE_DETAILS];
+        await this.captureObserveRecord(requestId, rawInput, normalizedInput, output, durationMs, reasons, contract.quality);
+        await this.captureStatsRecord(rawInput, output, durationMs, timings, undefined, reasons, contract.quality);
         return;
       }
 
@@ -667,8 +668,9 @@ export class CondenseSession {
         if (contract.quality && contract.quality.action !== "none") {
           if (contract.quality.action === "raw") this.renderWatchFallback(current.raw);
           else this.renderWatchSummary(contract.output);
-          await this.captureObserveRecord(randomUUID().replace(/-/g, "").slice(0, 16), current.raw, current.normalized, contract.output, durationMs, [INCOMPLETE_FAILURE_DETAILS], contract.quality, current.startedAtMs);
-          await this.captureStatsRecord(current.raw, contract.output, durationMs, undefined, undefined, [INCOMPLETE_FAILURE_DETAILS], contract.quality, current.startedAtMs);
+          const reasons = [contract.quality.rejectionReason ?? INCOMPLETE_FAILURE_DETAILS];
+          await this.captureObserveRecord(randomUUID().replace(/-/g, "").slice(0, 16), current.raw, current.normalized, contract.output, durationMs, reasons, contract.quality, current.startedAtMs);
+          await this.captureStatsRecord(current.raw, contract.output, durationMs, undefined, undefined, reasons, contract.quality, current.startedAtMs);
           this.trimWatchHistory();
           return;
         }

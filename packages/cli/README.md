@@ -54,9 +54,9 @@ condense stats --days 7
 bun test 2>&1 | condense --stats "Did tests pass?"
 ```
 
-Before applying the 8K local input budget, Condense scans the full log for failure and risk evidence. Runtime checks preserve original errors, failing items, locator diagnostics, and actionable source locations. Incomplete model answers are replaced by a shorter deterministic evidence excerpt when possible; otherwise the original log is returned with no compression credit.
+Before applying the 8K local input budget, Condense scans the full log for failure, risk, and explicit successful outcomes. Runtime checks preserve original errors, failing items, locator diagnostics, and actionable source locations. Incorrect failure verdicts on confirmed successful runs are replaced with PASS and original outcome statistics. Conflicting or insufficient evidence returns the original log instead of forcing a verdict. Incomplete failure answers use a shorter deterministic evidence excerpt when possible; raw fallbacks receive no compression credit.
 
-Stats reports measured failure/risk contract pass rates, critical evidence recall, effective estimated tokens saved, Guard repairs, abandoned savings, and end-to-end P95 latency. Historical runs without quality measurements remain unassessed.
+Stats reports measured outcome contract pass rates, critical failure evidence recall, effective estimated tokens saved, Guard repairs, abandoned savings, and end-to-end P95 latency. False failure verdicts are recorded separately from dropped errors. Historical runs without quality measurements remain unassessed.
 
 ## License
 

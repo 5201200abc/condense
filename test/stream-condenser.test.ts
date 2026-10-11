@@ -153,7 +153,7 @@ describe("CondenseSession", () => {
         }
       });
 
-      session.push(Buffer.from("1 passed\n"));
+      session.push(Buffer.from("Tests: 1 passed, 0 failed\nProcess completed with exit code 0.\n"));
       await session.end();
 
       const [line] = (await readFile(datasetPath, "utf8")).trim().split("\n");
@@ -164,7 +164,7 @@ describe("CondenseSession", () => {
       expect(record.prompt).toContain(
         "QUESTION:\nDid the tests pass? Return PASS or FAIL."
       );
-      expect(record.prompt).toContain("INPUT:\n1 passed");
+      expect(record.prompt).toContain("INPUT:\nTests: 1 passed, 0 failed");
       expect(record.completion).toBe("PASS");
       expect(record.metadata.source).toBe("condense");
       expect(record.metadata.mode).toBe("batch");

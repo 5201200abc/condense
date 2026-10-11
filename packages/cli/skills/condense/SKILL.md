@@ -27,7 +27,7 @@ set -o pipefail
 
 ## Reliability
 
-Condense scans the full input for critical evidence before applying the local 8K character budget. It checks supported failure/risk output contracts against that evidence. An incomplete model answer is replaced with a deterministic evidence excerpt when it retains the required evidence and is shorter; otherwise the original log is returned.
+Condense scans the full input for critical evidence before applying the local 8K character budget. It checks supported failure/risk contracts and explicit successful outcomes. A false failure verdict on a confirmed successful run is corrected using original outcome statistics and recorded separately from dropped errors. Conflicting or insufficient evidence returns the original log rather than forcing a verdict. Incomplete failure answers use a shorter deterministic evidence excerpt when possible; otherwise the original log is returned.
 
 Read the delivered result before acting. If a summary does not answer the task or more surrounding context is needed, use `condense recall <request-id>` to inspect the captured original log. `condense stats -H` lists recent suspect request IDs; `condense stats --json` exposes measured quality and savings. Runs without quality measurements are unassessed.
 

@@ -11,6 +11,7 @@ export interface EvidenceQuality {
   retained: number;
   action: "none" | "repair" | "raw";
   abandonedTokens?: number;
+  rejectionReason?: string;
 }
 
 export function cleanLog(input: string): string {
@@ -23,6 +24,7 @@ export function cleanLog(input: string): string {
 }
 
 const WARNING = /\[console\.warn\]|^\s*(?:\[[^\]\n]+\]\s*)?warn(?:ing)?\b/i;
+const HISTORY = /^\s*(?:\[history\]|history:|historical (?:error|reference):|previous run:|documentation example:)/i;
 const ERROR = /\b(?:\w*Error|\w*Exception)(?:\s*\[[^\]\n]+\])?:\s*\S|\blocator\.\w+: Timeout \d+ms exceeded\b|^\s*(?:FAIL|FAILED|✗|×|\(fail\))\s+\S|(?:^|\s)[^\s]+\(\d+,\d+\):\s*error TS\d+|(?:^|\s)[^\s]+:\d+:\d+\s*[-:]\s*error TS\d+|^\s*[^\s]+\.py:\d+:\s*\w*(?:Error|Exception)\b|^\s*error(?:\[[^\]]+\])?:\s*\S|^\s*##\[error\]\S|\bProcess completed with exit code [1-9]\d*\b|^\s*\S+:\s*line \d+:.*(?:command not found|\bKilled\b)/;
 const RISK = /will be destroyed|must be replaced|# forces replacement|\b[1-9]\d* to destroy\b/i;
 // Preserve reported outcomes in model input without treating success as a failure
@@ -47,7 +49,7 @@ export function extractCriticalEvidence(input: string): CriticalEvidence {
   };
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (WARNING.test(line)) continue;
+    if (WARNING.test(line) || HISTORY.test(line)) continue;
     const failure = ERROR.test(line) || /^\s*name:\s*['"]TimeoutError['"]/.test(line);
     const risk = RISK.test(line);
     if (!failure && !risk) continue;
@@ -101,6 +103,36 @@ export function assessEvidence(evidence: CriticalEvidence, output: string): numb
   return evidence.anchors.filter((anchor) => normalized.includes(anchor)).length;
 }
 
+function assessOutcome(input: string, evidence: CriticalEvidence, question?: string) {
+  const lines = cleanLog(input).split("\n").filter((line) => !WARNING.test(line) && !HISTORY.test(line));
+  const proof: string[] = [];
+  const passed = new Set<number>(), failed = new Set<number>(), exits = new Set<number>();
+  let safePlan = false, noChanges = false, zeroTests = false;
+  for (const line of lines) {
+    const stats = line.match(/^\s*(?:Tests?:\s*)?(\d+) passed, (\d+) failed\b/i);
+    const pass = line.match(/^\s*(\d+) pass(?:ed)?\b/i);
+    const fail = line.match(/^\s*(\d+) fail(?:ed)?\b/i);
+    const exit = line.match(/^\s*(?:##\[error\])?Process completed with exit code (\d+)\./);
+    if (stats) { passed.add(Number(stats[1])); failed.add(Number(stats[2])); proof.push(line); }
+    else if (pass) { passed.add(Number(pass[1])); proof.push(line); }
+    else if (fail) { failed.add(Number(fail[1])); proof.push(line); }
+    if (exit) { exits.add(Number(exit[1])); proof.push(line); }
+    if (/^\s*Plan: 0 to add, 0 to change, 0 to destroy\./.test(line)) { safePlan = true; proof.push(line); }
+    if (/^\s*No changes\. Your infrastructure matches the configuration\./.test(line)) { noChanges = true; proof.push(line); }
+    zeroTests ||= /\b(?:no tests (?:ran|found)|ran 0 tests|0 tests collected)\b/i.test(line);
+  }
+  zeroTests ||= passed.has(0) && ![...passed].some((n) => n > 0);
+  const hasErrors = evidence.anchors.length > 0;
+  const safe = safePlan && noChanges;
+  const conflict = (hasErrors && (exits.has(0) || safe)) || exits.size > 1 ||
+    passed.size > 1 || failed.size > 1 || ((safe || exits.has(0)) && [...failed].some((n) => n > 0));
+  const successful = exits.size === 1 && exits.has(0) && !zeroTests && !hasErrors &&
+    ![...failed].some((n) => n > 0) &&
+    (!/\btests?\b|测试/i.test(question ?? "") || [...passed].some((n) => n > 0));
+  return { conflict, verdict: safe && !hasErrors ? "SAFE" : successful ? "PASS" : undefined,
+    proof: [...new Set(proof)], zeroTests };
+}
+
 export function enforceEvidenceContract(input: string, summary: string, question?: string): {
   output: string;
   quality?: EvidenceQuality;
@@ -108,7 +140,34 @@ export function enforceEvidenceContract(input: string, summary: string, question
   const evidence = extractCriticalEvidence(input);
   const details = requestsEvidence(question);
   const statusRequest = /\bPASS\b.*\bFAIL\b|\bFAIL\b.*\bPASS\b|\bSAFE\b.*\bUNSAFE\b|\bUNSAFE\b.*\bSAFE\b/i.test(question ?? "");
-  if (!evidence.anchors.length || (!details && !statusRequest)) return { output: summary.trim() };
+  if (!details && !statusRequest) return { output: summary.trim() };
+  const outcome = assessOutcome(input, evidence, question);
+  const uncertain = (reason: string) => ({ output: input, quality: {
+    modelContractPassed: false, contractPassed: false,
+    required: details ? evidence.anchors.length : 0,
+    retained: details ? evidence.anchors.length : 0,
+    action: "raw" as const, rejectionReason: reason
+  } });
+  if (outcome.conflict) return uncertain("conflicting_outcomes");
+  if (!evidence.anchors.length) {
+    const positive = /\bSAFE\b|\bUNSAFE\b/i.test(question ?? "") ? outcome.verdict === "SAFE" : outcome.verdict === "PASS";
+    if (positive) {
+      const verdict = outcome.verdict!;
+      const claimedFailure = cleanLog(summary).split("\n").some((line) => !WARNING.test(line) && !HISTORY.test(line) && ERROR.test(line));
+      const modelContractPassed = new RegExp(`^${verdict}\\b`).test(summary.trim()) && !claimedFailure;
+      if (modelContractPassed) return { output: summary.trim(), quality: {
+        modelContractPassed: true, contractPassed: true, required: 0, retained: 0, action: "none"
+      } };
+      const output = details ? `${verdict}\n${outcome.proof.join("\n")}` : verdict;
+      return { output, quality: {
+        modelContractPassed: false, contractPassed: true, required: 0, retained: 0, action: "repair",
+        rejectionReason: /^(?:FAIL|UNSAFE)\b/.test(summary.trim()) || claimedFailure ? "false_failure" : "incomplete_outcome"
+      } };
+    }
+    if (summary.trim() === "condense: Insufficient information to output anything.") return { output: summary.trim() };
+    if (statusRequest || /^(?:PASS|FAIL|SAFE|UNSAFE)\b/.test(summary.trim())) return uncertain("unverified_outcome");
+    return { output: summary.trim() };
+  }
   const retained = details ? assessEvidence(evidence, summary) : 0;
   const required = details ? evidence.anchors.length : 0;
   const verdict = /\bSAFE\b|\bUNSAFE\b/i.test(question ?? "") || evidence.kind === "risk" ? "UNSAFE" : "FAIL";

@@ -36,7 +36,9 @@ describe("critical evidence pipeline", () => {
     expect(enforceEvidenceContract(input, complete, question).quality?.modelContractPassed).toBe(true);
     expect(enforceEvidenceContract(input, "FAIL", "PASS or FAIL?").output).toBe("FAIL");
     expect(enforceEvidenceContract(input, "PASS", "PASS or FAIL?").output).toBe("FAIL");
-    expect(enforceEvidenceContract("WARNING: recovered from TimeoutError", "FAIL", question).quality).toBeUndefined();
+    const unknown = enforceEvidenceContract("WARNING: recovered from TimeoutError", "FAIL", question);
+    expect(unknown.output).toBe("WARNING: recovered from TimeoutError");
+    expect(unknown.quality?.rejectionReason).toBe("unverified_outcome");
   });
 
   it("preserves destructive evidence and rejects an unsafe SAFE verdict", () => {

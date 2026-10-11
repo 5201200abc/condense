@@ -788,6 +788,12 @@ export function formatSuspectReason(reason: string): string {
     case "missed_fail":
     case "missed_critical":
       return "Dropped error";
+    case "false_failure":
+      return "False failure";
+    case "conflicting_outcomes":
+      return "Conflicting outcomes";
+    case "unverified_outcome":
+      return "Unverified outcome";
     default:
       return reason;
   }
@@ -977,6 +983,7 @@ export function formatStatsReport(
     effectiveTokensSaved: assessed.reduce((sum, r) => sum + (r.quality!.contractPassed && r.quality!.action !== "raw"
       ? Math.max(0, r.rawEstimatedTokens - r.outputEstimatedTokens) : 0), 0),
     guardRepairs: assessed.filter((r) => r.quality!.action === "repair").length,
+    falseFailures: assessed.filter((r) => r.quality!.rejectionReason === "false_failure").length,
     rawFallbacks: assessed.filter((r) => r.quality!.action === "raw").length,
     abandonedTokens: assessed.reduce((sum, r) => sum + (r.quality!.abandonedTokens ?? 0), 0),
     endToEndP95Ms: latencies.length ? latencies[Math.ceil(latencies.length * 0.95) - 1] : null,
@@ -998,6 +1005,9 @@ export function formatStatsReport(
       r.suspectReasons.includes("missed_critical") ||
       r.suspectReasons.includes(INCOMPLETE_FAILURE_DETAILS)
   ).length;
+  const falseFailure = activeRecords.filter((r) => r.suspectReasons.includes("false_failure")).length;
+  const conflictingOutcomes = activeRecords.filter((r) => r.suspectReasons.includes("conflicting_outcomes")).length;
+  const unverifiedOutcome = activeRecords.filter((r) => r.suspectReasons.includes("unverified_outcome")).length;
 
   const clientCounts: Record<string, number> = {};
   for (const r of activeRecords) {
@@ -1140,7 +1150,10 @@ export function formatStatsReport(
         mixedPassFail,
         timeoutNoResult,
         terraformUnsafe,
-        droppedError
+        droppedError,
+        falseFailure,
+        conflictingOutcomes,
+        unverifiedOutcome
       },
       clients: Object.fromEntries(sortedClients),
       contextWindows: jsonWindows,
@@ -1199,9 +1212,12 @@ export function formatStatsReport(
   lines.push(formatStatsRow("  Timeout / no result", timeoutNoResult));
   lines.push(formatStatsRow("  Terraform unsafe", terraformUnsafe));
   lines.push(formatStatsRow("  Dropped error", droppedError));
+  if (falseFailure) lines.push(formatStatsRow("  False failure", falseFailure));
+  if (conflictingOutcomes) lines.push(formatStatsRow("  Conflicting outcomes", conflictingOutcomes));
+  if (unverifiedOutcome) lines.push(formatStatsRow("  Unverified outcome", unverifiedOutcome));
   if (assessed.length) {
     lines.push("");
-    lines.push("Quality · assessed failure/risk contracts");
+    lines.push("Quality · assessed outcome contracts");
     lines.push("------------");
     lines.push(formatStatsRow("Contract Pass Rate", `${qualityMetrics.contractPassRate}%`));
     lines.push(formatStatsRow("Model contract pass", qualityMetrics.modelContractPassRate === null ? "unknown" : `${qualityMetrics.modelContractPassRate}%`));

@@ -25,13 +25,14 @@ and report path. Temporary config, Recall, Observe and Stats files are isolated.
 A transparent proxy observes the exact response used by the compiled local CLI,
 without changing its local provider or 8K budget. Independent labels score both
 the original model response and delivered output. Reports include per-family
-results, missing input evidence, repairs, raw fallbacks, false repairs, effective
+results, missing input evidence, repairs, false failures, raw fallbacks, false repairs, effective
 estimated token savings, and complete-process P95 for successful compression.
 
 The runner exits nonzero when any delivered verdict/evidence contract fails,
 labelled input evidence is missing, the 8K budget is exceeded, or a warning/safe
-case triggers repair. A correction of an incorrect model verdict
-on a status-only failure request is legitimate. Failed runs are retained as
+case with an independently correct model answer triggers repair. A correction
+of an incorrect model verdict, including a false failure on confirmed success
+or a status-only failure request, is legitimate. Failed runs are retained as
 evidence, including cases where positive outcomes were lost during input fitting.
 Passing unit tests do not override a failed live benchmark.
 
@@ -39,11 +40,14 @@ The baseline report used the `c49c74a` compiled CLI. Comparisons use the same
 fixtures and model server; they measure these 18 cases only. No model training
 or npm publication is part of this acceptance.
 
-The latest report passes 17/18 delivered contracts, compared with 9/18 in the
+The latest report passes 18/18 delivered contracts, compared with 9/18 in the
 baseline. Model responses pass 5/18 independently labelled contracts; the Guard
-repairs 12 responses. All required failure evidence and labelled input evidence
-are retained, with zero raw fallbacks and zero false repairs. The remaining
-warning-only case fails: despite seeing `48 passed, 0 failed` and exit code 0,
-the model invents errors and a source path, and the current failure/risk guard
-does not assess it. The live acceptance therefore remains failed. These results
+repairs 13 responses, including one separately recorded `false_failure`. All
+required failure evidence and labelled input evidence are retained, with zero
+raw fallbacks and zero false repairs. The warning-only case now delivers PASS
+with original `48 passed, 0 failed` statistics and exit code 0; fabricated errors
+and source paths are removed. The live acceptance for these 18 cases passes.
+Additional unit cases cover historical references, actual errors followed by
+exit code 0, contradictory statistics, unknown outcomes, and zero tests run;
+conflicting or insufficient evidence does not force PASS or FAIL. These results
 do not establish general reliability on unseen production logs.

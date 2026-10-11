@@ -71,7 +71,7 @@ async function run(fixture: typeof robustnessCases[number]) {
   const pipeline = evaluateRobustnessOutput(fixture, result.output);
   if (result.code !== 0) pipeline.contractPassed = false;
   const missingFromModelInput = inference ? fixture.inputRequired.filter((anchor) => !inference.input.includes(anchor)) : fixture.inputRequired;
-  const expectedNoRepair = !fixture.guard && !fixture.statusOnly;
+  const expectedNoRepair = !fixture.guard && !fixture.statusOnly && model?.contractPassed === true;
   const falseRepair = expectedNoRepair && stat.quality?.action !== undefined && stat.quality.action !== "none";
   return {
     id: fixture.id, family: fixture.family, position: fixture.position, expectedVerdict: fixture.verdict,
@@ -102,6 +102,7 @@ function summary(rows: Row[]) {
     modelInputEvidenceRecall: percentage(rows.reduce((n, r) => n + r.requiredInputAnchors - r.missingFromModelInput.length, 0), rows.reduce((n, r) => n + r.requiredInputAnchors, 0)),
     modelInputBudgetViolations: rows.filter((r) => r.modelInputChars !== null && r.modelInputChars > 8000).length,
     guardRepairs: rows.filter((row) => row.guardAction === "repair").length,
+    falseFailures: rows.filter((row) => row.runtimeQuality?.rejectionReason === "false_failure").length,
     rawFallbacks: rows.filter((row) => row.guardAction === "raw").length,
     falseRepairs: rows.filter((row) => row.falseRepair).length,
     effectiveTokensSaved: rows.reduce((n, row) => n + row.effectiveTokensSaved, 0), effectiveCalls: effective.length,
