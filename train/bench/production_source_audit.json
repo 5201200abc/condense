@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-10-11T17:13:40.619895Z",
+  "evaluation_id": "prospective-production-22b5fa1-round1",
+  "code_object_commit": "22b5fa10df23e6f433fce0ff41f820a80808ea66",
+  "scope": {
+    "enabled_app_projects_checked": true,
+    "filesystem_search_root": "/Users/mfordjody",
+    "max_depth": 5,
+    "excluded_directory_names": [
+      "Library",
+      "node_modules",
+      ".git",
+      ".cache",
+      ".rustup",
+      "registry"
+    ],
+    "restricted_directories_not_searched": [
+      "Music/Music",
+      ".Trash"
+    ],
+    "absence_status_means": "not found in this checked scope, not proof of absence elsewhere"
+  },
+  "inspection_commands_count_as_samples": false,
+  "new_eligible_samples": 0,
+  "registration_status": "draft; collection window and registered_at remain null",
+  "verified_candidate": {
+    "id": "lumen-build",
+    "project": "/Users/mfordjody/other/lumen",
+    "argv": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "question": "PASS or FAIL? List failing build steps with their relevant raw error messages. Otherwise report generated build outputs.",
+    "reports": [],
+    "environment": {},
+    "role": "primary_candidate",
+    "verification": {
+      "verified_at": "2026-10-11T17:13:40.619895Z",
+      "repository": "https://github.com/5201200abc/lumen",
+      "commit_at_verification": "32f398dad1d8bbd1a9a7e78363cadc65e26f8561",
+      "working_tree": "clean",
+      "script": "electron-vite build",
+      "package_json_sha256": "bd16e0a1b99c097a4ee1e9970093a4cf12132af5ec975cd44ef36b03278ead0f",
+      "package_lock_sha256": "8b7e7f7ab60438a3c3b32fe54884027bc2eb76d1408263f51561874e7273063b",
+      "build_config_sha256": "0d0a920343ce7ca2d8d325b749b5f8c1b564b45f0ce6ddb80be26386c95d7868",
+      "node_version": "v25.6.1",
+      "npm_version": "11.9.0",
+      "dependency_check": {
+        "command": [
+          "rtk",
+          "npm",
+          "ls",
+          "--depth=0"
+        ],
+        "exit_code": 0,
+        "all_top_level_dependencies_satisfied": true
+      },
+      "workflow_definition_verified": true,
+      "build_execution": "not_run; awaiting a real daily work trigger"
+    }
+  },
+  "other_candidates": [
+    {
+      "project": "mycode",
+      "repository": "https://github.com/5201200abc/mycode",
+      "historical_path": "/Users/mfordjody/other/mycode",
+      "historical_path_exists": false,
+      "candidate_commands": [
+        [
+          "pnpm",
+          "run",
+          "lint"
+        ],
+        [
+          "pnpm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "pnpm",
+          "run",
+          "build"
+        ]
+      ],
+      "status": "not_found_in_checked_scope",
+      "included": false,
+      "note": "Saved Codex project entry points to the missing historical directory."
+    },
+    {
+      "project": "rtk",
+      "repository": "https://github.com/5201200abc/rtk",
+      "candidate_command": [
+        "cargo",
+        "test",
+        "--locked"
+      ],
+      "status": "not_found_in_checked_scope",
+      "included": false
+    },
+    {
+      "project": "caveman",
+      "repository": "https://github.com/5201200abc/caveman",
+      "candidate_command": [
+        "npm",
+        "test"
+      ],
+      "status": "upstream_plugin_checkout_only",
+      "found_path": "/Users/mfordjody/.claude/plugins/marketplaces/caveman",
+      "found_repository": "https://github.com/JuliusBrussee/caveman",
+      "found_commit": "2fd153c67988e980fb0b2455c90832159a6a5a25",
+      "working_tree": "clean",
+      "node_modules_exists": false,
+      "command_execution": "not_run",
+      "included": false,
+      "note": "Not the declared fork; managed plugin checkout is not silently substituted as a daily project source."
+    },
+    {
+      "project": "videos-workflow",
+      "repository": "https://github.com/5201200abc/videos-workflow",
+      "candidate_command": [
+        "npm",
+        "test"
+      ],
+      "status": "not_found_in_checked_scope",
+      "included": false
+    },
+    {
+      "project": "app2me",
+      "path": "/Users/mfordjody/other/app2me",
+      "repository": "https://github.com/5201200abc/app2me",
+      "legacy_remote": "https://github.com/5201200abc/mycode",
+      "status": "excluded_by_round1_source_selection",
+      "included": false,
+      "note": "A legacy-mycode remote alone does not establish that the missing mycode directory moved here."
+    },
+    {
+      "project": "condense",
+      "path": "/Users/mfordjody/other/condense",
+      "repository": "https://github.com/5201200abc/condense",
+      "status": "auxiliary_regression_only",
+      "included_in_primary_blind_roster": false
+    }
+  ],
+  "next_requirement": "Specify a collection window; then seal the source roster before the first naturally required build. No builds or tests were launched during this source inspection."
+}

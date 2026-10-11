@@ -46,6 +46,21 @@ Guard、8K 预算或压缩逻辑，不训练 v3，不发布 npm。
 }
 ```
 
+## 本机来源核实
+
+[来源审计](production_source_audit.json) 记录本机检索范围、仓库身份、
+命令定义及依赖检查。Lumen 位于 `/Users/mfordjody/other/lumen`，
+`npm run build`、构建入口及依赖已核实；未为本次核实执行构建。
+
+`/Users/mfordjody/other/mycode` 已不存在；在已检查范围内未找到 RTK
+或 videos-workflow 项目目录。发现的 Caveman 是 Claude 插件目录中的
+上游仓库，并非所列 fork，暂不替代登记。app2me 保持本轮来源选择中的
+排除状态，Condense 仅用于辅助回归。
+
+本机 `sources.json` 已填入 `lumen-build` 草案；registered_at 和时间
+窗口仍为 null，正式预注册及采集尚未开始。目录与依赖核实记录不计作
+盲测样本，实际执行能力需在日常工作触发该命令时留存真实结果。
+
 ## 采集与隔离
 
 使用 `collect_prospective.py` 执行已登记的原始产出命令；数据目录必须在
