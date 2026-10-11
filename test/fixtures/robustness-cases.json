@@ -1,0 +1,92 @@
+[
+  {
+    "id": "playwright-click-middle", "family": "Playwright", "position": "middle",
+    "signal": "FAIL tests/checkout.spec.ts:18:1 › checkout submits payment\nlocator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n",
+    "verdict": "FAIL", "required": ["tests/checkout.spec.ts:18:1 › checkout submits payment", "locator.click: Timeout 30000ms exceeded.", "getByRole('button', { name: 'Pay now' })", "/app/tests/checkout.spec.ts:28:7"], "guard": true
+  },
+  {
+    "id": "playwright-two-failures", "family": "Playwright", "position": "end",
+    "signal": "FAIL tests/login.spec.ts:11:1 › login accepts valid credentials\nError: expect(received).toBe(expected)\n  Expected: 200\n  Received: 503\n    at login (/app/tests/login.spec.ts:24:9)\nFAIL tests/search.spec.ts:9:1 › search finds results\nlocator.waitFor: Timeout 5000ms exceeded.\n    at search (/app/tests/search.spec.ts:19:5)\n",
+    "verdict": "FAIL", "required": ["tests/login.spec.ts:11:1", "Error: expect(received).toBe(expected)", "Expected: 200", "Received: 503", "/app/tests/login.spec.ts:24:9", "tests/search.spec.ts:9:1", "locator.waitFor: Timeout 5000ms exceeded.", "/app/tests/search.spec.ts:19:5"], "guard": true
+  },
+  {
+    "id": "typescript-plain-diagnostic", "family": "TypeScript", "position": "start",
+    "signal": "src/cart.ts(42,9): error TS2322: Type 'string' is not assignable to type 'number'.\n",
+    "verdict": "FAIL", "required": ["src/cart.ts(42,9): error TS2322: Type 'string' is not assignable to type 'number'."], "guard": true
+  },
+  {
+    "id": "typescript-pretty-diagnostics", "family": "TypeScript", "position": "middle",
+    "signal": "src/order.ts:17:5 - error TS2304: Cannot find name 'customerId'.\n17     customerId,\n       ~~~~~~~~~~\nsrc/order.ts:21:3 - error TS2345: Argument of type 'null' is not assignable to parameter of type 'Order'.\n21   saveOrder(null);\n     ~~~~~~~~~~~~~~~\nFound 2 errors in the same file, starting at: src/order.ts:17\n",
+    "verdict": "FAIL", "required": ["src/order.ts:17:5 - error TS2304: Cannot find name 'customerId'.", "src/order.ts:21:3 - error TS2345: Argument of type 'null' is not assignable to parameter of type 'Order'."], "guard": true
+  },
+  {
+    "id": "typescript-ansi-crlf", "family": "TypeScript", "position": "end",
+    "signal": "\u001b[91msrc/user.ts(6,2): error TS2339: Property 'email' does not exist on type 'Guest'.\u001b[0m\r\n",
+    "verdict": "FAIL", "required": ["src/user.ts(6,2): error TS2339: Property 'email' does not exist on type 'Guest'."], "guard": true
+  },
+  {
+    "id": "python-traceback", "family": "Python", "position": "middle",
+    "signal": "Traceback (most recent call last):\n  File \"/app/billing.py\", line 73, in invoice\n    return subtotal / count\nZeroDivisionError: division by zero\n",
+    "verdict": "FAIL", "required": ["File \"/app/billing.py\", line 73, in invoice", "ZeroDivisionError: division by zero"], "guard": true
+  },
+  {
+    "id": "python-chained-exceptions", "family": "Python", "position": "start",
+    "signal": "Traceback (most recent call last):\n  File \"/app/loader.py\", line 21, in decode\n    payload = json.loads(raw)\nValueError: invalid document\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/app/worker.py\", line 98, in execute\n    decode(raw)\nRuntimeError: failed to load invoice\n",
+    "verdict": "FAIL", "required": ["File \"/app/loader.py\", line 21", "ValueError: invalid document", "File \"/app/worker.py\", line 98", "RuntimeError: failed to load invoice"], "guard": true
+  },
+  {
+    "id": "python-pytest-item", "family": "Python", "position": "end",
+    "signal": "tests/test_discount.py:32: AssertionError\nE       AssertionError: expected 0.9, got 1.0\nFAILED tests/test_discount.py::test_member_discount - AssertionError: expected 0.9, got 1.0\n1 failed, 18 passed in 0.42s\n",
+    "verdict": "FAIL", "required": ["tests/test_discount.py::test_member_discount", "AssertionError: expected 0.9, got 1.0", "tests/test_discount.py:32"], "guard": true
+  },
+  {
+    "id": "ci-command-failure", "family": "CI", "position": "middle",
+    "signal": "Run ./scripts/deploy.sh\n./scripts/deploy.sh: line 12: kubectl: command not found\n##[error]Process completed with exit code 127.\n",
+    "verdict": "FAIL", "required": ["./scripts/deploy.sh: line 12: kubectl: command not found", "Process completed with exit code 127."], "guard": true
+  },
+  {
+    "id": "ci-build-failure", "family": "CI", "position": "end",
+    "signal": "Run npm run build\nError: Cannot resolve module './missing-config'\n    at build (/app/scripts/build.mjs:16:2)\n##[error]Process completed with exit code 1.\n",
+    "verdict": "FAIL", "required": ["Error: Cannot resolve module './missing-config'", "/app/scripts/build.mjs:16:2", "Process completed with exit code 1."], "guard": true
+  },
+  {
+    "id": "ci-explicit-killed-step", "family": "CI", "position": "start",
+    "signal": "Run ./scripts/bundle-assets.sh\n./scripts/bundle-assets.sh: line 8: 512 Killed node ./bundle.mjs\n##[error]Process completed with exit code 137.\n",
+    "verdict": "FAIL", "required": ["./scripts/bundle-assets.sh: line 8: 512 Killed node ./bundle.mjs", "Process completed with exit code 137."], "guard": true
+  },
+  {
+    "id": "terraform-destroy", "family": "Terraform", "position": "middle",
+    "signal": "  # module.billing.aws_db_instance.primary will be destroyed\n  - resource \"aws_db_instance\" \"primary\" {\n      - deletion_protection = false -> null\n    }\nPlan: 0 to add, 0 to change, 1 to destroy.\n",
+    "verdict": "UNSAFE", "required": ["module.billing.aws_db_instance.primary will be destroyed", "Plan: 0 to add, 0 to change, 1 to destroy."], "guard": true
+  },
+  {
+    "id": "terraform-replacement", "family": "Terraform", "position": "end",
+    "signal": "  # aws_instance.worker must be replaced\n-/+ resource \"aws_instance\" \"worker\" {\n      ~ ami = \"ami-old\" -> \"ami-new\" # forces replacement\n    }\nPlan: 1 to add, 0 to change, 1 to destroy.\n",
+    "verdict": "UNSAFE", "required": ["aws_instance.worker must be replaced", "ami = \"ami-old\" -> \"ami-new\" # forces replacement", "Plan: 1 to add, 0 to change, 1 to destroy."], "guard": true
+  },
+  {
+    "id": "terraform-warning-only", "family": "Terraform", "position": "middle",
+    "signal": "Warning: Argument is deprecated\n  on main.tf line 24, in resource \"aws_s3_bucket\" \"logs\":\nNo changes. Your infrastructure matches the configuration.\nPlan: 0 to add, 0 to change, 0 to destroy.\n",
+    "verdict": "SAFE", "required": [], "inputRequired": ["No changes. Your infrastructure matches the configuration.", "Plan: 0 to add, 0 to change, 0 to destroy."], "guard": false
+  },
+  {
+    "id": "warning-only-timeout-text", "family": "CI", "position": "middle",
+    "signal": "WARNING: recovered from TimeoutError: retry succeeded\nWARNING: documentation example says Error: missing token; no error was executed\nTests: 48 passed, 0 failed\nProcess completed with exit code 0.\n",
+    "verdict": "PASS", "required": [], "inputRequired": ["Tests: 48 passed, 0 failed", "Process completed with exit code 0."], "guard": false
+  },
+  {
+    "id": "mixed-pass-fail-bun", "family": "CI", "position": "end",
+    "signal": "(pass) api responds successfully [1ms]\nTypeError: discount is undefined\n    at calculate (/app/src/discount.ts:38:4)\n(fail) cart applies member discount [4ms]\n19 pass\n1 fail\nRan 20 tests across 3 files.\n",
+    "verdict": "FAIL", "required": ["TypeError: discount is undefined", "/app/src/discount.ts:38:4", "(fail) cart applies member discount"], "guard": true
+  },
+  {
+    "id": "very-long-middle-two-errors", "family": "CI", "position": "middle", "noiseLines": 2500,
+    "signal": "FAIL tests/archive.test.ts\nRangeError: archive exceeds supported size\n    at archive (/app/src/archive.ts:81:11)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\n",
+    "verdict": "FAIL", "required": ["tests/archive.test.ts", "RangeError: archive exceeds supported size", "/app/src/archive.ts:81:11", "tests/restore.test.ts", "Error: checksum mismatch", "/app/src/restore.ts:64:2"], "guard": true
+  },
+  {
+    "id": "failure-status-only", "family": "Playwright", "position": "middle", "statusOnly": true,
+    "signal": "locator.click: Timeout 30000ms exceeded.\n    at submit (/app/tests/order.spec.ts:18:3)\n",
+    "verdict": "FAIL", "required": [], "guard": false
+  }
+]

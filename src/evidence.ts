@@ -23,10 +23,13 @@ export function cleanLog(input: string): string {
 }
 
 const WARNING = /\[console\.warn\]|^\s*(?:\[[^\]\n]+\]\s*)?warn(?:ing)?\b/i;
-const ERROR = /\b(?:\w*Error|\w*Exception)(?:\s*\[[^\]\n]+\])?:\s*\S|\blocator\.\w+: Timeout \d+ms exceeded\b|^\s*(?:FAIL|FAILED|✗|×)\s+\S|(?:^|\s)[^\s]+\(\d+,\d+\):\s*error TS\d+|^\s*error(?:\[[^\]]+\])?:\s*\S/;
+const ERROR = /\b(?:\w*Error|\w*Exception)(?:\s*\[[^\]\n]+\])?:\s*\S|\blocator\.\w+: Timeout \d+ms exceeded\b|^\s*(?:FAIL|FAILED|✗|×|\(fail\))\s+\S|(?:^|\s)[^\s]+\(\d+,\d+\):\s*error TS\d+|(?:^|\s)[^\s]+:\d+:\d+\s*[-:]\s*error TS\d+|^\s*[^\s]+\.py:\d+:\s*\w*(?:Error|Exception)\b|^\s*error(?:\[[^\]]+\])?:\s*\S|^\s*##\[error\]\S|\bProcess completed with exit code [1-9]\d*\b|^\s*\S+:\s*line \d+:.*(?:command not found|\bKilled\b)/;
 const RISK = /will be destroyed|must be replaced|# forces replacement|\b[1-9]\d* to destroy\b/i;
+// Preserve reported outcomes in model input without treating success as a failure
+// or risk anchor in the output guard.
+const OUTCOME = /^\s*(?:(?:Tests?|Test Suites):|\d+ (?:pass(?:ed)?|fail(?:ed)?)\b|(?:##\[error\])?Process completed with exit code \d+\.|Plan: \d+ to add, \d+ to change, \d+ to destroy\.|No changes\. Your infrastructure matches the configuration\.)/;
 const FRAME = /^\s*at\s+\S/;
-const CONTEXT = /^\s*(?:Call log:|[-·]|at\s|name:|actual:|expected:|operator:|code:|\}|\{|\^)|^\s*\d+\s*(?:\||[×x])/;
+const CONTEXT = /^\s*(?:Call log:|[-·]|at\s|name:|actual:|expected:|received:|operator:|code:|\}|\{|\^)|^\s*\d+\s*(?:\||[×x])/i;
 
 /** Scan every line before any budget is applied. Repeated messages/frames are deduplicated. */
 export function extractCriticalEvidence(input: string): CriticalEvidence {
@@ -81,7 +84,7 @@ export function extractCriticalEvidence(input: string): CriticalEvidence {
       if (ERROR.test(next) || WARNING.test(next) || !CONTEXT.test(next)) break;
       if (FRAME.test(next)) {
         if (!/node_modules|node:internal|<anonymous>|UtilityScript|triggerUncaughtException/.test(next)) add(next);
-      } else if (/waiting for (?:getBy|locator)|element is (?:not |outside)|intercepts pointer events|\b(?:actual|expected|operator|code|name):|^\s*\d+\s*\|/.test(next)) {
+      } else if (/waiting for (?:getBy|locator)|element is (?:not |outside)|intercepts pointer events|\b(?:actual|expected|received|operator|code|name):|^\s*\d+\s*\|/i.test(next)) {
         add(next);
       }
     }
@@ -90,7 +93,7 @@ export function extractCriticalEvidence(input: string): CriticalEvidence {
 }
 
 export function requestsEvidence(question?: string): boolean {
-  return !!question && /\b(?:failing|failed|failure)\s+(?:items?|tests?|cases?|commands?|details?)\b|\b(?:raw|original)\s+(?:error|failure)|\b(?:list|include|show|report|provide)\b[^\n?]*\b(?:errors?|failures?|risks?)\b|\bsummari[sz]e\b|失败项|原始错误|错误详情|列出.*(?:错误|失败|风险)|总结|压缩/i.test(question);
+  return !!question && /\b(?:failing|failed|failure)\s+(?:items?|tests?|cases?|commands?|details?)\b|\b(?:raw|original)\s+(?:error|failure)|\b(?:list|include|show|report|provide)\b[^\n?]*\b(?:errors?|failures?|risks?|risky changes|destructive changes)\b|\bsummari[sz]e\b|失败项|原始错误|错误详情|列出.*(?:错误|失败|风险)|总结|压缩/i.test(question);
 }
 
 export function assessEvidence(evidence: CriticalEvidence, output: string): number {
@@ -137,7 +140,8 @@ export class EvidenceBudgetExceeded extends Error {
 export function fitEvidenceInput(input: string, maxChars: number): string {
   if (input.length <= maxChars) return input;
   const evidence = extractCriticalEvidence(input);
-  const critical = evidence.lines.join("\n");
+  const outcomes = cleanLog(input).split("\n").filter((line) => OUTCOME.test(line));
+  const critical = [...new Set([...evidence.lines, ...outcomes])].join("\n");
   const marker = `\n... [chars truncated; critical evidence retained] ...\n`;
   if (critical.length + marker.length > maxChars) throw new EvidenceBudgetExceeded();
   const remaining = maxChars - critical.length - marker.length - 5;

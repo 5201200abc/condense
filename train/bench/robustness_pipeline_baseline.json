@@ -1,0 +1,954 @@
+{
+  "recordedAt": "2026-10-11T15:30:48.888Z",
+  "platform": "darwin-arm64",
+  "binary": "/Users/mfordjody/.local/bin/condense",
+  "binarySha256": "ce300de283fa9720cd5e55e8028975debfdc27c485242852d6100f176de2f43a",
+  "scope": "18 newly authored synthetic format cases with independent gold labels; not a held-out production sample, and not a re-score of the old 100-case benchmark.",
+  "method": "One compiled local CLI invocation per case. A transparent proxy captures the same model response and actual 8K-budget input; independent gold labels evaluate both outputs.",
+  "summary": {
+    "cases": 18,
+    "modelAssessed": 18,
+    "modelContractPassRate": 22.22,
+    "pipelineContractPassRate": 50,
+    "modelCriticalEvidenceRecall": 39.13,
+    "pipelineCriticalEvidenceRecall": 67.39,
+    "modelInputEvidenceRecall": 84,
+    "modelInputBudgetViolations": 0,
+    "guardRepairs": 10,
+    "rawFallbacks": 0,
+    "falseRepairs": 0,
+    "effectiveTokensSaved": 82084,
+    "effectiveCalls": 9,
+    "endToEndP95Ms": 5495.55,
+    "failedCases": [
+      "playwright-two-failures",
+      "typescript-pretty-diagnostics",
+      "python-pytest-item",
+      "ci-command-failure",
+      "ci-build-failure",
+      "ci-explicit-killed-step",
+      "terraform-destroy",
+      "terraform-replacement",
+      "terraform-warning-only",
+      "warning-only-timeout-text"
+    ]
+  },
+  "families": {
+    "Playwright": {
+      "cases": 3,
+      "modelAssessed": 3,
+      "modelContractPassRate": 33.33,
+      "pipelineContractPassRate": 66.67,
+      "modelCriticalEvidenceRecall": 41.67,
+      "pipelineCriticalEvidenceRecall": 75,
+      "modelInputEvidenceRecall": 100,
+      "modelInputBudgetViolations": 0,
+      "guardRepairs": 2,
+      "rawFallbacks": 0,
+      "falseRepairs": 0,
+      "effectiveTokensSaved": 7123,
+      "effectiveCalls": 2,
+      "endToEndP95Ms": 5394,
+      "failedCases": [
+        "playwright-two-failures"
+      ]
+    },
+    "TypeScript": {
+      "cases": 3,
+      "modelAssessed": 3,
+      "modelContractPassRate": 0,
+      "pipelineContractPassRate": 66.67,
+      "modelCriticalEvidenceRecall": 0,
+      "pipelineCriticalEvidenceRecall": 50,
+      "modelInputEvidenceRecall": 50,
+      "modelInputBudgetViolations": 0,
+      "guardRepairs": 2,
+      "rawFallbacks": 0,
+      "falseRepairs": 0,
+      "effectiveTokensSaved": 3841,
+      "effectiveCalls": 2,
+      "endToEndP95Ms": 584.15,
+      "failedCases": [
+        "typescript-pretty-diagnostics"
+      ]
+    },
+    "Python": {
+      "cases": 3,
+      "modelAssessed": 3,
+      "modelContractPassRate": 0,
+      "pipelineContractPassRate": 66.67,
+      "modelCriticalEvidenceRecall": 22.22,
+      "pipelineCriticalEvidenceRecall": 88.89,
+      "modelInputEvidenceRecall": 100,
+      "modelInputBudgetViolations": 0,
+      "guardRepairs": 3,
+      "rawFallbacks": 0,
+      "falseRepairs": 0,
+      "effectiveTokensSaved": 5842,
+      "effectiveCalls": 2,
+      "endToEndP95Ms": 5017.66,
+      "failedCases": [
+        "python-pytest-item"
+      ]
+    },
+    "CI": {
+      "cases": 6,
+      "modelAssessed": 6,
+      "modelContractPassRate": 33.33,
+      "pipelineContractPassRate": 33.33,
+      "modelCriticalEvidenceRecall": 68.75,
+      "pipelineCriticalEvidenceRecall": 75,
+      "modelInputEvidenceRecall": 77.78,
+      "modelInputBudgetViolations": 0,
+      "guardRepairs": 1,
+      "rawFallbacks": 0,
+      "falseRepairs": 0,
+      "effectiveTokensSaved": 61367,
+      "effectiveCalls": 2,
+      "endToEndP95Ms": 5495.55,
+      "failedCases": [
+        "ci-command-failure",
+        "ci-build-failure",
+        "ci-explicit-killed-step",
+        "warning-only-timeout-text"
+      ]
+    },
+    "Terraform": {
+      "cases": 3,
+      "modelAssessed": 3,
+      "modelContractPassRate": 33.33,
+      "pipelineContractPassRate": 33.33,
+      "modelCriticalEvidenceRecall": 0,
+      "pipelineCriticalEvidenceRecall": 0,
+      "modelInputEvidenceRecall": 71.43,
+      "modelInputBudgetViolations": 0,
+      "guardRepairs": 2,
+      "rawFallbacks": 0,
+      "falseRepairs": 0,
+      "effectiveTokensSaved": 3911,
+      "effectiveCalls": 1,
+      "endToEndP95Ms": 874.3,
+      "failedCases": [
+        "terraform-destroy",
+        "terraform-replacement",
+        "terraform-warning-only"
+      ]
+    }
+  },
+  "rows": [
+    {
+      "id": "playwright-click-middle",
+      "family": "Playwright",
+      "position": "middle",
+      "expectedVerdict": "FAIL",
+      "inputChars": 14013,
+      "outputChars": 1699,
+      "elapsedMs": 5394,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 4,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 4,
+        "retained": 4,
+        "missing": [],
+        "contractPassed": true
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 4,
+        "retained": 4,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "none",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": true,
+        "contractPassed": true,
+        "required": 5,
+        "retained": 5,
+        "action": "none",
+        "abandonedTokens": 0
+      },
+      "cacheN": 1821,
+      "effectiveTokensSaved": 3252,
+      "modelOutput": "FAIL tests/checkout.spec.ts:18:1 › checkout submits payment\nlocator.click: Timeout 30000ms exceeded.\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button',",
+      "output": "FAIL tests/checkout.spec.ts:18:1 › checkout submits payment\nlocator.click: Timeout 30000ms exceeded.\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button', { name: 'Pay now' })\n    - element is not visible\n    at submitPayment (/app/tests/checkout.spec.ts:28:7)\n  - waiting for getByRole('button',\n"
+    },
+    {
+      "id": "playwright-two-failures",
+      "family": "Playwright",
+      "position": "end",
+      "expectedVerdict": "FAIL",
+      "inputChars": 7202,
+      "outputChars": 250,
+      "elapsedMs": 613.56,
+      "modelInputChars": 7201,
+      "requiredInputAnchors": 8,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 8,
+        "retained": 1,
+        "missing": [
+          "Error: expect(received).toBe(expected)",
+          "Expected: 200",
+          "Received: 503",
+          "/app/tests/login.spec.ts:24:9",
+          "tests/search.spec.ts:9:1",
+          "locator.waitFor: Timeout 5000ms exceeded.",
+          "/app/tests/search.spec.ts:19:5"
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 8,
+        "retained": 5,
+        "missing": [
+          "Expected: 200",
+          "Received: 503",
+          "/app/tests/login.spec.ts:24:9"
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 5,
+        "retained": 5,
+        "action": "repair",
+        "abandonedTokens": 80
+      },
+      "cacheN": 1681,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "FAIL tests/login.spec.ts:11:1",
+      "output": "FAIL\nFAIL tests/login.spec.ts:11:1 › login accepts valid credentials\nError: expect(received).toBe(expected)\nFAIL tests/search.spec.ts:9:1 › search finds results\nlocator.waitFor: Timeout 5000ms exceeded.\n    at search (/app/tests/search.spec.ts:19:5)\n"
+    },
+    {
+      "id": "typescript-plain-diagnostic",
+      "family": "TypeScript",
+      "position": "start",
+      "expectedVerdict": "FAIL",
+      "inputChars": 6963,
+      "outputChars": 88,
+      "elapsedMs": 584.15,
+      "modelInputChars": 6962,
+      "requiredInputAnchors": 1,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 1,
+        "retained": 0,
+        "missing": [
+          "src/cart.ts(42,9): error TS2322: Type 'string' is not assignable to type 'number'."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 1,
+        "retained": 1,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 1,
+        "retained": 1,
+        "action": "repair",
+        "abandonedTokens": 1
+      },
+      "cacheN": 1609,
+      "effectiveTokensSaved": 1918,
+      "modelOutput": "FAIL src/cart.ts:42,9: error TS2322: Type 'string' is not assignable to type 'number'.",
+      "output": "FAIL\nsrc/cart.ts(42,9): error TS2322: Type 'string' is not assignable to type 'number'.\n"
+    },
+    {
+      "id": "typescript-pretty-diagnostics",
+      "family": "TypeScript",
+      "position": "middle",
+      "expectedVerdict": "FAIL",
+      "inputChars": 14073,
+      "outputChars": 40,
+      "elapsedMs": 392.65,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 2,
+      "missingFromModelInput": [
+        "src/order.ts:17:5 - error TS2304: Cannot find name 'customerId'.",
+        "src/order.ts:21:3 - error TS2345: Argument of type 'null' is not assignable to parameter of type 'Order'."
+      ],
+      "inputContractPassed": false,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 0,
+        "missing": [
+          "src/order.ts:17:5 - error TS2304: Cannot find name 'customerId'.",
+          "src/order.ts:21:3 - error TS2345: Argument of type 'null' is not assignable to parameter of type 'Order'."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 0,
+        "missing": [
+          "src/order.ts:17:5 - error TS2304: Cannot find name 'customerId'.",
+          "src/order.ts:21:3 - error TS2345: Argument of type 'null' is not assignable to parameter of type 'Order'."
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "unassessed",
+      "falseRepair": false,
+      "runtimeQuality": null,
+      "cacheN": 1793,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "FAIL: 1. \"success\" is not a valid word.",
+      "output": "FAIL: 1. \"success\" is not a valid word.\n"
+    },
+    {
+      "id": "typescript-ansi-crlf",
+      "family": "TypeScript",
+      "position": "end",
+      "expectedVerdict": "FAIL",
+      "inputChars": 6971,
+      "outputChars": 86,
+      "elapsedMs": 409.24,
+      "modelInputChars": 6960,
+      "requiredInputAnchors": 1,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 1,
+        "retained": 0,
+        "missing": [
+          "src/user.ts(6,2): error TS2339: Property 'email' does not exist on type 'Guest'."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 1,
+        "retained": 1,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 1,
+        "retained": 1,
+        "action": "repair",
+        "abandonedTokens": 28
+      },
+      "cacheN": 1608,
+      "effectiveTokensSaved": 1923,
+      "modelOutput": "FAIL src/user.ts:6,2",
+      "output": "FAIL\nsrc/user.ts(6,2): error TS2339: Property 'email' does not exist on type 'Guest'.\n"
+    },
+    {
+      "id": "python-traceback",
+      "family": "Python",
+      "position": "middle",
+      "expectedVerdict": "FAIL",
+      "inputChars": 13905,
+      "outputChars": 87,
+      "elapsedMs": 5017.66,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 2,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 1,
+        "missing": [
+          "ZeroDivisionError: division by zero"
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 2,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 2,
+        "retained": 2,
+        "action": "repair",
+        "abandonedTokens": 0
+      },
+      "cacheN": 1802,
+      "effectiveTokensSaved": 3859,
+      "modelOutput": "FAIL\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in invoice\n  File \"/app/billing.py\", line 73, in",
+      "output": "FAIL\nZeroDivisionError: division by zero\n  File \"/app/billing.py\", line 73, in invoice\n"
+    },
+    {
+      "id": "python-chained-exceptions",
+      "family": "Python",
+      "position": "start",
+      "expectedVerdict": "FAIL",
+      "inputChars": 7222,
+      "outputChars": 160,
+      "elapsedMs": 279.2,
+      "modelInputChars": 7221,
+      "requiredInputAnchors": 4,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 4,
+        "retained": 0,
+        "missing": [
+          "File \"/app/loader.py\", line 21",
+          "ValueError: invalid document",
+          "File \"/app/worker.py\", line 98",
+          "RuntimeError: failed to load invoice"
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 4,
+        "retained": 4,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 4,
+        "retained": 4,
+        "action": "repair",
+        "abandonedTokens": 60
+      },
+      "cacheN": 1669,
+      "effectiveTokensSaved": 1983,
+      "modelOutput": "FAIL",
+      "output": "FAIL\nValueError: invalid document\n  File \"/app/loader.py\", line 21, in decode\nRuntimeError: failed to load invoice\n  File \"/app/worker.py\", line 98, in execute\n"
+    },
+    {
+      "id": "python-pytest-item",
+      "family": "Python",
+      "position": "end",
+      "expectedVerdict": "FAIL",
+      "inputChars": 7089,
+      "outputChars": 143,
+      "elapsedMs": 360.76,
+      "modelInputChars": 7088,
+      "requiredInputAnchors": 3,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 3,
+        "retained": 1,
+        "missing": [
+          "AssertionError: expected 0.9, got 1.0",
+          "tests/test_discount.py:32"
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 3,
+        "retained": 2,
+        "missing": [
+          "tests/test_discount.py:32"
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 2,
+        "retained": 2,
+        "action": "repair",
+        "abandonedTokens": 38
+      },
+      "cacheN": 1645,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "FAIL tests/test_discount.py::test_member_discount",
+      "output": "FAIL\nE       AssertionError: expected 0.9, got 1.0\nFAILED tests/test_discount.py::test_member_discount - AssertionError: expected 0.9, got 1.0\n"
+    },
+    {
+      "id": "ci-command-failure",
+      "family": "CI",
+      "position": "middle",
+      "expectedVerdict": "FAIL",
+      "inputChars": 13888,
+      "outputChars": 40,
+      "elapsedMs": 389.67,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 2,
+      "missingFromModelInput": [
+        "./scripts/deploy.sh: line 12: kubectl: command not found",
+        "Process completed with exit code 127."
+      ],
+      "inputContractPassed": false,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 0,
+        "missing": [
+          "./scripts/deploy.sh: line 12: kubectl: command not found",
+          "Process completed with exit code 127."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 0,
+        "missing": [
+          "./scripts/deploy.sh: line 12: kubectl: command not found",
+          "Process completed with exit code 127."
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "unassessed",
+      "falseRepair": false,
+      "runtimeQuality": null,
+      "cacheN": 1793,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "FAIL: 1. \"success\" is not a valid word.",
+      "output": "FAIL: 1. \"success\" is not a valid word.\n"
+    },
+    {
+      "id": "ci-build-failure",
+      "family": "CI",
+      "position": "end",
+      "expectedVerdict": "FAIL",
+      "inputChars": 7034,
+      "outputChars": 96,
+      "elapsedMs": 828.96,
+      "modelInputChars": 7033,
+      "requiredInputAnchors": 3,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 3,
+        "retained": 1,
+        "missing": [
+          "/app/scripts/build.mjs:16:2",
+          "Process completed with exit code 1."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 3,
+        "retained": 2,
+        "missing": [
+          "Process completed with exit code 1."
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 2,
+        "retained": 2,
+        "action": "repair",
+        "abandonedTokens": 19
+      },
+      "cacheN": 268,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "FAIL\nError: Cannot resolve module './missing-config'",
+      "output": "FAIL\nError: Cannot resolve module './missing-config'\n    at build (/app/scripts/build.mjs:16:2)\n"
+    },
+    {
+      "id": "ci-explicit-killed-step",
+      "family": "CI",
+      "position": "start",
+      "expectedVerdict": "FAIL",
+      "inputChars": 7023,
+      "outputChars": 70,
+      "elapsedMs": 423.94,
+      "modelInputChars": 7022,
+      "requiredInputAnchors": 2,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 1,
+        "missing": [
+          "Process completed with exit code 137."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 1,
+        "missing": [
+          "Process completed with exit code 137."
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "unassessed",
+      "falseRepair": false,
+      "runtimeQuality": null,
+      "cacheN": 1625,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "FAIL\n./scripts/bundle-assets.sh: line 8: 512 Killed node ./bundle.mjs",
+      "output": "FAIL\n./scripts/bundle-assets.sh: line 8: 512 Killed node ./bundle.mjs\n"
+    },
+    {
+      "id": "terraform-destroy",
+      "family": "Terraform",
+      "position": "middle",
+      "expectedVerdict": "UNSAFE",
+      "inputChars": 13957,
+      "outputChars": 7,
+      "elapsedMs": 200.62,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 2,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "SAFE",
+        "verdictPassed": false,
+        "required": 2,
+        "retained": 0,
+        "missing": [
+          "module.billing.aws_db_instance.primary will be destroyed",
+          "Plan: 0 to add, 0 to change, 1 to destroy."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "UNSAFE",
+        "verdictPassed": true,
+        "required": 2,
+        "retained": 0,
+        "missing": [
+          "module.billing.aws_db_instance.primary will be destroyed",
+          "Plan: 0 to add, 0 to change, 1 to destroy."
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 0,
+        "retained": 0,
+        "action": "repair",
+        "abandonedTokens": 0
+      },
+      "cacheN": 1807,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "SAFE",
+      "output": "UNSAFE\n"
+    },
+    {
+      "id": "terraform-replacement",
+      "family": "Terraform",
+      "position": "end",
+      "expectedVerdict": "UNSAFE",
+      "inputChars": 7067,
+      "outputChars": 7,
+      "elapsedMs": 194.03,
+      "modelInputChars": 7066,
+      "requiredInputAnchors": 3,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "SAFE",
+        "verdictPassed": false,
+        "required": 3,
+        "retained": 0,
+        "missing": [
+          "aws_instance.worker must be replaced",
+          "ami = \"ami-old\" -> \"ami-new\" # forces replacement",
+          "Plan: 1 to add, 0 to change, 1 to destroy."
+        ],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "UNSAFE",
+        "verdictPassed": true,
+        "required": 3,
+        "retained": 0,
+        "missing": [
+          "aws_instance.worker must be replaced",
+          "ami = \"ami-old\" -> \"ami-new\" # forces replacement",
+          "Plan: 1 to add, 0 to change, 1 to destroy."
+        ],
+        "contractPassed": false
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 0,
+        "retained": 0,
+        "action": "repair",
+        "abandonedTokens": 0
+      },
+      "cacheN": 1640,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "SAFE",
+      "output": "UNSAFE\n"
+    },
+    {
+      "id": "terraform-warning-only",
+      "family": "Terraform",
+      "position": "middle",
+      "expectedVerdict": "SAFE",
+      "inputChars": 13952,
+      "outputChars": 5,
+      "elapsedMs": 874.3,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 2,
+      "missingFromModelInput": [
+        "No changes. Your infrastructure matches the configuration.",
+        "Plan: 0 to add, 0 to change, 0 to destroy."
+      ],
+      "inputContractPassed": false,
+      "model": {
+        "verdict": "SAFE",
+        "verdictPassed": true,
+        "required": 0,
+        "retained": 0,
+        "missing": [],
+        "contractPassed": true
+      },
+      "pipeline": {
+        "verdict": "SAFE",
+        "verdictPassed": true,
+        "required": 0,
+        "retained": 0,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "unassessed",
+      "falseRepair": false,
+      "runtimeQuality": null,
+      "cacheN": 268,
+      "effectiveTokensSaved": 3911,
+      "modelOutput": "SAFE",
+      "output": "SAFE\n"
+    },
+    {
+      "id": "warning-only-timeout-text",
+      "family": "CI",
+      "position": "middle",
+      "expectedVerdict": "PASS",
+      "inputChars": 13957,
+      "outputChars": 40,
+      "elapsedMs": 478.46,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 2,
+      "missingFromModelInput": [
+        "Tests: 48 passed, 0 failed",
+        "Process completed with exit code 0."
+      ],
+      "inputContractPassed": false,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": false,
+        "required": 0,
+        "retained": 0,
+        "missing": [],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": false,
+        "required": 0,
+        "retained": 0,
+        "missing": [],
+        "contractPassed": false
+      },
+      "guardAction": "unassessed",
+      "falseRepair": false,
+      "runtimeQuality": null,
+      "cacheN": 1282,
+      "effectiveTokensSaved": 0,
+      "modelOutput": "FAIL: 1. \"success\" is not a valid word.",
+      "output": "FAIL: 1. \"success\" is not a valid word.\n"
+    },
+    {
+      "id": "mixed-pass-fail-bun",
+      "family": "CI",
+      "position": "end",
+      "expectedVerdict": "FAIL",
+      "inputChars": 7083,
+      "outputChars": 125,
+      "elapsedMs": 1212.55,
+      "modelInputChars": 7082,
+      "requiredInputAnchors": 3,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 3,
+        "retained": 3,
+        "missing": [],
+        "contractPassed": true
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 3,
+        "retained": 3,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "none",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": true,
+        "contractPassed": true,
+        "required": 2,
+        "retained": 2,
+        "action": "none",
+        "abandonedTokens": 0
+      },
+      "cacheN": 268,
+      "effectiveTokensSaved": 1953,
+      "modelOutput": "FAIL\nTypeError: discount is undefined\n    at calculate (/app/src/discount.ts:38:4)\n(fail) cart applies member discount [4ms]",
+      "output": "FAIL\nTypeError: discount is undefined\n    at calculate (/app/src/discount.ts:38:4)\n(fail) cart applies member discount [4ms]\n"
+    },
+    {
+      "id": "very-long-middle-two-errors",
+      "family": "CI",
+      "position": "middle",
+      "expectedVerdict": "FAIL",
+      "inputChars": 215207,
+      "outputChars": 1738,
+      "elapsedMs": 5495.55,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 6,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 6,
+        "retained": 6,
+        "missing": [],
+        "contractPassed": true
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 6,
+        "retained": 6,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "none",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": true,
+        "contractPassed": true,
+        "required": 6,
+        "retained": 6,
+        "action": "none",
+        "abandonedTokens": 0
+      },
+      "cacheN": 1811,
+      "effectiveTokensSaved": 59414,
+      "modelOutput": "FAIL tests/archive.test.ts\nRangeError: archive exceeds supported size\n    at archive (/app/src/archive.ts:81:11)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts",
+      "output": "FAIL tests/archive.test.ts\nRangeError: archive exceeds supported size\n    at archive (/app/src/archive.ts:81:11)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\nError: checksum mismatch\n    at restore (/app/src/restore.ts:64:2)\nFAIL tests/restore.test.ts\n"
+    },
+    {
+      "id": "failure-status-only",
+      "family": "Playwright",
+      "position": "middle",
+      "expectedVerdict": "FAIL",
+      "inputChars": 13847,
+      "outputChars": 5,
+      "elapsedMs": 302.27,
+      "modelInputChars": 8000,
+      "requiredInputAnchors": 0,
+      "missingFromModelInput": [],
+      "inputContractPassed": true,
+      "model": {
+        "verdict": "PASS",
+        "verdictPassed": false,
+        "required": 0,
+        "retained": 0,
+        "missing": [],
+        "contractPassed": false
+      },
+      "pipeline": {
+        "verdict": "FAIL",
+        "verdictPassed": true,
+        "required": 0,
+        "retained": 0,
+        "missing": [],
+        "contractPassed": true
+      },
+      "guardAction": "repair",
+      "falseRepair": false,
+      "runtimeQuality": {
+        "modelContractPassed": false,
+        "contractPassed": true,
+        "required": 0,
+        "retained": 0,
+        "action": "repair",
+        "abandonedTokens": 0
+      },
+      "cacheN": 1795,
+      "effectiveTokensSaved": 3871,
+      "modelOutput": "PASS",
+      "output": "FAIL\n"
+    }
+  ]
+}
